@@ -6,10 +6,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
-class MainViewModel(private val llm: Llm = Llm.instance()): ViewModel() {
+class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     companion object {
         @JvmStatic
         private val NanosPerSecond = 1_000_000_000.0
@@ -22,6 +24,19 @@ class MainViewModel(private val llm: Llm = Llm.instance()): ViewModel() {
 
     var message by mutableStateOf("")
         private set
+
+    var showMemoryInfo by mutableStateOf(false)
+        private set
+
+    var showModelPath by mutableStateOf(false)
+        private set
+
+    var currentModelPath: String? by mutableStateOf(null)
+        private set
+
+    private var isLoading by mutableStateOf(false)
+
+    private var sendJob: Job? = null
 
     override fun onCleared() {
         super.onCleared()
@@ -36,20 +51,32 @@ class MainViewModel(private val llm: Llm = Llm.instance()): ViewModel() {
     }
 
     fun send() {
-        val text = message
+        val text = message.trim()
+        if (text.isEmpty()) return
         message = ""
 
-        // Add to messages console.
         messages += text
         messages += ""
 
-        viewModelScope.launch {
-            llm.send(text)
-                .catch {
-                    Log.e(tag, "send() failed", it)
-                    messages += it.message!!
-                }
-                .collect { messages = messages.dropLast(1) + (messages.last() + it) }
+        sendJob = viewModelScope.launch {
+            val responseBuilder = StringBuilder()
+            try {
+                llm.send(text)
+                    .catch { e ->
+                        Log.e(tag, "send() failed", e)
+                        messages = messages.dropLast(1) + e.message!!
+                    }
+                    .collect { token ->
+                        responseBuilder.append(token)
+                        messages = messages.dropLast(1) + responseBuilder.toString()
+                    }
+            } catch (e: CancellationException) {
+                Log.i(tag, "send() canceled")
+                messages += "Operation canceled."
+            } catch (e: Exception) {
+                Log.e(tag, "send() failed", e)
+                messages += "Error: ${e.message ?: "Unknown error"}"
+            }
         }
     }
 
@@ -79,13 +106,23 @@ class MainViewModel(private val llm: Llm = Llm.instance()): ViewModel() {
     }
 
     fun load(pathToModel: String) {
+        if (isLoading) {
+            messages += "Model is already loading. Please wait."
+            return
+        }
+
+        isLoading = true
         viewModelScope.launch {
             try {
+                sendJob?.cancel()
                 llm.load(pathToModel)
+                currentModelPath = pathToModel
                 messages += "Loaded $pathToModel"
             } catch (exc: IllegalStateException) {
                 Log.e(tag, "load() failed", exc)
                 messages += exc.message!!
+            } finally {
+                isLoading = false
             }
         }
     }
@@ -100,5 +137,13 @@ class MainViewModel(private val llm: Llm = Llm.instance()): ViewModel() {
 
     fun log(message: String) {
         messages += message
+    }
+
+    fun toggleMemoryInfo() {
+        showMemoryInfo = !showMemoryInfo
+    }
+
+    fun toggleModelPath() {
+        showModelPath = !showModelPath
     }
 }

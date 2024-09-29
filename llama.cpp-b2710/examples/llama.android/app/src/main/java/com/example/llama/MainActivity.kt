@@ -12,22 +12,14 @@ import android.text.format.Formatter
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Button
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
 import com.example.llama.ui.theme.LlamaAndroidTheme
@@ -37,8 +29,7 @@ class MainActivity(
     activityManager: ActivityManager? = null,
     downloadManager: DownloadManager? = null,
     clipboardManager: ClipboardManager? = null,
-): ComponentActivity() {
-    private val tag: String? = this::class.simpleName
+) : ComponentActivity() {
 
     private val activityManager by lazy { activityManager ?: getSystemService<ActivityManager>()!! }
     private val downloadManager by lazy { downloadManager ?: getSystemService<DownloadManager>()!! }
@@ -46,7 +37,6 @@ class MainActivity(
 
     private val viewModel: MainViewModel by viewModels()
 
-    // Get a MemoryInfo object for the device's current memory status.
     private fun availableMemory(): ActivityManager.MemoryInfo {
         return ActivityManager.MemoryInfo().also { memoryInfo ->
             activityManager.getMemoryInfo(memoryInfo)
@@ -70,27 +60,29 @@ class MainActivity(
 
         val extFilesDir = getExternalFilesDir(null)
 
+        // ダウンロード済みモデルを検出
+        val downloadedModels = extFilesDir?.listFiles { file ->
+            file.isFile && file.extension == "gguf"
+        }?.map { file ->
+            Downloadable(
+                file.name,
+                Uri.EMPTY,
+                file,
+                sha256 = "" // ダウンロード済みモデルのSHA256は空文字列とする
+            )
+        } ?: emptyList()
+
         val models = listOf(
-            Downloadable(
-                "Phi-2 7B (Q4_0, 1.6 GiB)",
-                Uri.parse("https://huggingface.co/ggml-org/models/resolve/main/phi-2/ggml-model-q4_0.gguf?download=true"),
-                File(extFilesDir, "phi-2-q4_0.gguf"),
-            ),
-            Downloadable(
-                "TinyLlama 1.1B (f16, 2.2 GiB)",
-                Uri.parse("https://huggingface.co/ggml-org/models/resolve/main/tinyllama-1.1b/ggml-model-f16.gguf?download=true"),
-                File(extFilesDir, "tinyllama-1.1-f16.gguf"),
-            ),
             Downloadable(
                 "Phi 2 DPO (Q3_K_M, 1.48 GiB)",
                 Uri.parse("https://huggingface.co/TheBloke/phi-2-dpo-GGUF/resolve/main/phi-2-dpo.Q3_K_M.gguf?download=true"),
-                File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf")
+                File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf"),
+                sha256 = "e7effd3e3a3b6f1c05b914deca7c9646210bad34576d39d3c5c5f2a25cb97ae1"
             ),
-        )
+        ) + downloadedModels // ダウンロード済みモデルを追加
 
         setContent {
             LlamaAndroidTheme {
-                // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -102,7 +94,6 @@ class MainActivity(
                         models,
                     )
                 }
-
             }
         }
     }
@@ -115,37 +106,79 @@ fun MainCompose(
     dm: DownloadManager,
     models: List<Downloadable>
 ) {
-    Column {
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        // メモリ情報の表示
+        if (viewModel.showMemoryInfo) {
+            val activityManager = context.getSystemService<ActivityManager>()
+            val memoryInfo = ActivityManager.MemoryInfo()
+            activityManager?.getMemoryInfo(memoryInfo)
+            val free = Formatter.formatFileSize(context, memoryInfo.availMem)
+            val total = Formatter.formatFileSize(context, memoryInfo.totalMem)
+            Text("Memory: $free / $total", modifier = Modifier.padding(bottom = 8.dp))
+        }
+
+        // モデルパスの表示
+        if (viewModel.showModelPath) {
+            viewModel.currentModelPath?.let {
+                Text("Model Path: $it", modifier = Modifier.padding(bottom = 8.dp))
+            }
+        }
+
         val scrollState = rememberLazyListState()
 
         Box(modifier = Modifier.weight(1f)) {
-            LazyColumn(state = scrollState) {
-                items(viewModel.messages) {
+            LazyColumn(
+                state = scrollState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(viewModel.messages) { message ->
                     Text(
-                        it,
-                        style = MaterialTheme.typography.bodyLarge.copy(color = LocalContentColor.current),
-                        modifier = Modifier.padding(16.dp)
+                        text = message,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(vertical = 4.dp)
                     )
                 }
             }
         }
+
         OutlinedTextField(
             value = viewModel.message,
             onValueChange = { viewModel.updateMessage(it) },
             label = { Text("Message") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
         )
-        Row {
-            Button({ viewModel.send() }) { Text("Send") }
-            Button({ viewModel.bench(8, 4, 1) }) { Text("Bench") }
-            Button({ viewModel.clear() }) { Text("Clear") }
-            Button({
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = { viewModel.send() }) { Text("Send") }
+            Button(onClick = { viewModel.bench(8, 4, 1) }) { Text("Bench") }
+            Button(onClick = { viewModel.clear() }) { Text("Clear") }
+            Button(onClick = {
                 viewModel.messages.joinToString("\n").let {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", it))
                 }
             }) { Text("Copy") }
         }
 
-        Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
+            Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
+        }
+
+        Column(modifier = Modifier.padding(top = 8.dp)) {
             for (model in models) {
                 Downloadable.Button(viewModel, dm, model)
             }

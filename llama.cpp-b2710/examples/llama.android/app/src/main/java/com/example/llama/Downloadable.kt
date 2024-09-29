@@ -1,119 +1,187 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Downloadable.kt
 package com.example.llama
 
 import android.app.DownloadManager
 import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.core.database.getLongOrNull
-import androidx.core.net.toUri
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.security.MessageDigest
 
-data class Downloadable(val name: String, val source: Uri, val destination: File) {
+data class Downloadable(
+    val name: String,
+    val source: Uri,
+    val destination: File,
+    val sha256: String
+) {
     companion object {
         @JvmStatic
         private val tag: String? = this::class.qualifiedName
 
         sealed interface State
-        data object Ready: State
-        data class Downloading(val id: Long): State
-        data class Downloaded(val downloadable: Downloadable): State
-        data class Error(val message: String): State
+        data object Ready : State
+        data class Downloading(val progress: Int, val id: Long) : State
+        data class Downloaded(val downloadable: Downloadable) : State
+        data class Error(val message: String) : State
 
-        @JvmStatic
         @Composable
-        fun Button(viewModel: MainViewModel, dm: DownloadManager, item: Downloadable) {
-            var status: State by remember {
+        fun Button(
+            viewModel: MainViewModel,
+            dm: DownloadManager,
+            item: Downloadable
+        ) {
+            var status by remember {
                 mutableStateOf(
-                    if (item.destination.exists()) Downloaded(item)
-                    else Ready
+                    if (item.destination.exists() && (item.sha256.isEmpty() || verifyFileSha256(item.destination, item.sha256))) {
+                        Downloaded(item)
+                    } else {
+                        if (item.destination.exists()) {
+                            item.destination.delete()
+                        }
+                        Ready
+                    }
                 )
             }
-            var progress by remember { mutableDoubleStateOf(0.0) }
 
             val coroutineScope = rememberCoroutineScope()
 
-            suspend fun waitForDownload(result: Downloading, item: Downloadable): State {
+            suspend fun monitorDownload(downloadId: Long): State {
                 while (true) {
-                    val cursor = dm.query(DownloadManager.Query().setFilterById(result.id))
+                    val query = DownloadManager.Query().setFilterById(downloadId)
+                    val cursor = dm.query(query)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            val bytesDownloaded = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                            val bytesTotal = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                            val progress = if (bytesTotal > 0) ((bytesDownloaded * 100) / bytesTotal).toInt() else 0
 
-                    if (cursor == null) {
-                        Log.e(tag, "dm.query() returned null")
-                        return Error("dm.query() returned null")
-                    }
+                            val statusCode = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                            when (statusCode) {
+                                DownloadManager.STATUS_SUCCESSFUL -> {
+                                    if (item.sha256.isEmpty() || verifyFileSha256(item.destination, item.sha256)) {
+                                        return Downloaded(item)
+                                    } else {
+                                        item.destination.delete()
+                                        return Error("SHA256 checksum mismatch")
+                                    }
+                                }
+                                DownloadManager.STATUS_FAILED -> {
+                                    val reason = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                                    return Error("Download failed: $reason")
+                                }
+                                else -> {
+                                    status = Downloading(progress, downloadId)
+                                }
+                            }
+                        } else {
+                            return Error("Download not found")
+                        }
+                    } ?: return Error("Cursor is null")
 
-                    if (!cursor.moveToFirst() || cursor.count < 1) {
-                        cursor.close()
-                        Log.i(tag, "cursor.moveToFirst() returned false or cursor.count < 1, download canceled?")
-                        return Ready
-                    }
+                    delay(500L)
+                }
+            }
 
-                    val pix = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                    val tix = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                    val sofar = cursor.getLongOrNull(pix) ?: 0
-                    val total = cursor.getLongOrNull(tix) ?: 1
-                    cursor.close()
+            fun initiateDownload() {
+                item.destination.delete()
 
-                    if (sofar == total) {
-                        return Downloaded(item)
-                    }
+                val request = DownloadManager.Request(item.source).apply {
+                    setTitle("Downloading model")
+                    setDescription("Downloading model: ${item.name}")
+                    setAllowedNetworkTypes(
+                        DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
+                    )
+                    setDestinationUri(Uri.fromFile(item.destination))
+                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                }
 
-                    progress = (sofar * 1.0) / total
+                viewModel.log("Saving ${item.name} to ${item.destination.path}")
+                Log.i(tag, "Saving ${item.name} to ${item.destination.path}")
 
-                    delay(1000L)
+                val downloadId = dm.enqueue(request)
+                status = Downloading(0, downloadId)
+
+                coroutineScope.launch {
+                    status = monitorDownload(downloadId)
+                }
+            }
+
+            fun cancelDownload(downloadId: Long) {
+                val removed = dm.remove(downloadId)
+                if (removed > 0) {
+                    viewModel.log("Download cancelled: $downloadId")
+                    Log.i(tag, "Download cancelled: $downloadId")
+                    status = Ready
+                } else {
+                    viewModel.log("Failed to cancel download: $downloadId")
+                    Log.e(tag, "Failed to cancel download: $downloadId")
                 }
             }
 
             fun onClick() {
-                when (val s = status) {
+                when (status) {
                     is Downloaded -> {
                         viewModel.load(item.destination.path)
                     }
-
-                    is Downloading -> {
-                        coroutineScope.launch {
-                            status = waitForDownload(s, item)
-                        }
+                    is Ready, is Error -> {
+                        initiateDownload()
                     }
-
-                    else -> {
-                        item.destination.delete()
-
-                        val request = DownloadManager.Request(item.source).apply {
-                            setTitle("Downloading model")
-                            setDescription("Downloading model: ${item.name}")
-                            setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI)
-                            setDestinationUri(item.destination.toUri())
-                        }
-
-                        viewModel.log("Saving ${item.name} to ${item.destination.path}")
-                        Log.i(tag, "Saving ${item.name} to ${item.destination.path}")
-
-                        val id = dm.enqueue(request)
-                        status = Downloading(id)
-                        onClick()
+                    is Downloading -> {
+                        // ダウンロード中は何もしない（キャンセルは別ボタン）
                     }
                 }
             }
 
-            Button(onClick = { onClick() }, enabled = status !is Downloading) {
-                when (status) {
-                    is Downloading -> Text(text = "Downloading ${(progress * 100).toInt()}%")
+            Button(
+                onClick = { onClick() },
+                enabled = status !is Downloading
+            ) {
+                when (val currentStatus = status) {
+                    is Downloading -> {
+                        Text("Downloading ${currentStatus.progress}%")
+                    }
                     is Downloaded -> Text("Load ${item.name}")
-                    is Ready -> Text("Download ${item.name}")
-                    is Error -> Text("Download ${item.name}")
+                    is Ready -> Text(if (item.source == Uri.EMPTY) "Load ${item.name}" else "Download ${item.name}")
+                    is Error -> Text("Retry ${item.name}")
+                }
+            }
+
+            // ダウンロード中の場合にキャンセルボタンを表示
+            if (status is Downloading) {
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = {
+                    (status as? Downloading)?.let { cancelDownload(it.id) }
+                }) {
+                    Text("Cancel")
                 }
             }
         }
 
+        // SHA256チェックサムを検証する関数
+        private fun verifyFileSha256(file: File, expectedSha256: String): Boolean {
+            return try {
+                val digest = MessageDigest.getInstance("SHA-256")
+                file.inputStream().use { fis ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (fis.read(buffer).also { bytesRead = it } != -1) {
+                        digest.update(buffer, 0, bytesRead)
+                    }
+                }
+                val actualSha256 = digest.digest().joinToString("") { "%02x".format(it) }
+                actualSha256.equals(expectedSha256, ignoreCase = true)
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to compute SHA256: ${e.message}")
+                false
+            }
+        }
     }
 }
