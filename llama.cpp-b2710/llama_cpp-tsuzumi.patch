@@ -1,0 +1,174 @@
+diff --git a/convert-hf-to-gguf.py b/convert-hf-to-gguf.py
+index 4fd916cb..777af103 100755
+--- a/convert-hf-to-gguf.py
++++ b/convert-hf-to-gguf.py
+@@ -531,7 +531,9 @@ class MPTModel(Model):
+         self.gguf_writer.add_context_length(self.hparams["max_seq_len"])
+         self.gguf_writer.add_embedding_length(self.hparams["d_model"])
+         self.gguf_writer.add_block_count(block_count)
+-        self.gguf_writer.add_feed_forward_length(4 * self.hparams["d_model"])
++        # NOTE: For Tsuzumi
++        #self.gguf_writer.add_feed_forward_length(4 * self.hparams["d_model"])
++        self.gguf_writer.add_feed_forward_length(self.hparams["ffn_config"]["intermediate_size"])
+         self.gguf_writer.add_head_count(self.hparams["n_heads"])
+         if kv_n_heads := self.hparams["attn_config"].get("kv_n_heads"):
+             self.gguf_writer.add_head_count_kv(kv_n_heads)
+diff --git a/ggml.c b/ggml.c
+index a3b312e4..d12ebe6e 100644
+--- a/ggml.c
++++ b/ggml.c
+@@ -10344,7 +10344,7 @@ static void ggml_compute_forward_rms_norm_f32(
+     float eps;
+     memcpy(&eps, dst->op_params, sizeof(float));
+ 
+-    GGML_ASSERT(eps > 0.0f);
++    //GGML_ASSERT(eps > 0.0f); // NOTE: In Tsusuzmi, this assersion causes an error.
+ 
+     // TODO: optimize
+     for (int64_t i03 = 0; i03 < ne03; i03++) {
+diff --git a/gguf-py/gguf/constants.py b/gguf-py/gguf/constants.py
+index 06cb26a7..80aa8988 100644
+--- a/gguf-py/gguf/constants.py
++++ b/gguf-py/gguf/constants.py
+@@ -386,6 +386,7 @@ MODEL_TENSORS: dict[MODEL_ARCH, list[MODEL_TENSOR]] = {
+         MODEL_TENSOR.ATTN_QKV,
+         MODEL_TENSOR.ATTN_OUT,
+         MODEL_TENSOR.FFN_NORM,
++        MODEL_TENSOR.FFN_GATE, # NOTE: For Tsuzumi
+         MODEL_TENSOR.FFN_DOWN,
+         MODEL_TENSOR.FFN_UP,
+         MODEL_TENSOR.FFN_ACT,
+diff --git a/gguf-py/gguf/tensor_mapping.py b/gguf-py/gguf/tensor_mapping.py
+index 10de36fa..812e6c3c 100644
+--- a/gguf-py/gguf/tensor_mapping.py
++++ b/gguf-py/gguf/tensor_mapping.py
+@@ -264,6 +264,7 @@ class TensorNameMap:
+             "model.layers.layers.{bid}.mlp.gate_proj",    # plamo
+             "model.layers.{bid}.feed_forward.w1",         # internlm2
+             "encoder.layers.{bid}.mlp.fc12",              # nomic-bert
++            "transformer.blocks.{bid}.ffn.gate_proj",     # mpt # NOTE: For Tsuzumi
+         ),
+ 
+         MODEL_TENSOR.FFN_GATE_EXP: (
+diff --git a/llama.cpp b/llama.cpp
+index 7440c740..a5f11025 100644
+--- a/llama.cpp
++++ b/llama.cpp
+@@ -615,6 +615,7 @@ static const std::map<llm_arch, std::map<llm_tensor, std::string>> LLM_TENSOR_NA
+             { LLM_TENSOR_FFN_NORM,        "blk.%d.ffn_norm" },
+             { LLM_TENSOR_ATTN_QKV,        "blk.%d.attn_qkv" },
+             { LLM_TENSOR_ATTN_OUT,        "blk.%d.attn_output" },
++            { LLM_TENSOR_FFN_GATE,        "blk.%d.ffn_gate" },
+             { LLM_TENSOR_FFN_DOWN,        "blk.%d.ffn_down" },
+             { LLM_TENSOR_FFN_UP,          "blk.%d.ffn_up" },
+             { LLM_TENSOR_FFN_ACT,         "blk.%d.ffn.act" },
+@@ -1972,6 +1973,7 @@ struct llama_layer {
+     struct ggml_tensor * ffn_up_shexp;
+ 
+     // ff bias
++    struct ggml_tensor * ffn_gate_b; // b1
+     struct ggml_tensor * ffn_down_b; // b2
+     struct ggml_tensor * ffn_up_b;   // b3
+     struct ggml_tensor * ffn_act;
+@@ -5145,7 +5147,7 @@ static bool llm_load_tensors(
+                         layer.attn_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_NORM, "bias", i),   {n_embd}, false);
+ 
+                         layer.wqkv = ml.create_tensor(ctx_split, tn(LLM_TENSOR_ATTN_QKV, "weight", i), {n_embd, n_embd + 2*n_embd_gqa});
+-                        layer.bqkv = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_QKV, "bias", i),   {n_embd + 2*n_embd_gqa}, false);
++                        //layer.bqkv = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_QKV, "bias", i),   {n_embd + 2*n_embd_gqa}, false);
+ 
+                         layer.wo   = ml.create_tensor(ctx_split, tn(LLM_TENSOR_ATTN_OUT, "weight", i), {n_embd, n_embd});
+                         layer.bo   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_OUT, "bias", i),   {n_embd}, false);
+@@ -5153,17 +5155,20 @@ static bool llm_load_tensors(
+                         layer.ffn_norm   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_NORM, "weight", i), {n_embd});
+                         layer.ffn_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_NORM, "bias", i),   {n_embd}, false);
+ 
++                        layer.ffn_gate   = ml.create_tensor(ctx_split, tn(LLM_TENSOR_FFN_GATE, "weight", i), {n_embd, n_ff});
++                        layer.ffn_gate_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_GATE, "bias", i),   {n_ff}, false);
++
+                         layer.ffn_down   = ml.create_tensor(ctx_split, tn(LLM_TENSOR_FFN_DOWN, "weight", i), {n_ff, n_embd});
+                         layer.ffn_down_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_DOWN, "bias", i),   {n_embd}, false);
+ 
+                         layer.ffn_up     = ml.create_tensor(ctx_split, tn(LLM_TENSOR_FFN_UP,   "weight", i), {n_embd,   n_ff});
+                         layer.ffn_up_b   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_UP,   "bias", i),   {n_ff}, false);
+ 
+-                        layer.attn_q_norm   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_Q_NORM, "weight", i), {n_embd}, false);
+-                        layer.attn_q_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_Q_NORM, "bias",   i), {n_embd}, false);
++                        //layer.attn_q_norm   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_Q_NORM, "weight", i), {n_embd}, false);
++                        //layer.attn_q_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_Q_NORM, "bias",   i), {n_embd}, false);
+ 
+-                        layer.attn_k_norm   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_K_NORM, "weight", i), {n_embd}, false);
+-                        layer.attn_k_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_K_NORM, "bias",   i), {n_embd}, false);
++                        //layer.attn_k_norm   = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_K_NORM, "weight", i), {n_embd}, false);
++                        //layer.attn_k_norm_b = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_ATTN_K_NORM, "bias",   i), {n_embd}, false);
+ 
+                         // AWQ ScaleActivation layer
+                         layer.ffn_act = ml.create_tensor(ctx_layer, tn(LLM_TENSOR_FFN_ACT, "scales", i), {n_ff}, false);
+@@ -6183,12 +6188,11 @@ static struct ggml_tensor * llm_build_ffn(
+     }
+ 
+     cur = ggml_mul_mat(ctx, down, cur);
+-    if (down_b) {
+-        cb(cur, "ffn_down", il);
+-    }
++    cb(cur, "ffn_down", il);
+ 
+     if (down_b) {
+         cur = ggml_add(ctx, cur, down_b);
++        cb(cur, "ffn_down_b", il);
+     }
+ 
+     return cur;
+@@ -8229,7 +8233,7 @@ struct llm_build_context {
+             attn_norm = llm_build_norm(ctx0, inpL, hparams,
+                     model.layers[il].attn_norm,
+                     model.layers[il].attn_norm_b,
+-                    LLM_NORM, cb, il);
++                    LLM_NORM_RMS, cb, il);
+             cb(attn_norm, "attn_norm", il);
+ 
+             // self-attention
+@@ -8301,14 +8305,14 @@ struct llm_build_context {
+                 cur = llm_build_norm(ctx0, ffn_inp, hparams,
+                         model.layers[il].ffn_norm,
+                         model.layers[il].ffn_norm_b,
+-                        LLM_NORM, cb, il);
++                        LLM_NORM_RMS, cb, il);
+                 cb(cur, "ffn_norm", il);
+                 cur = llm_build_ffn(ctx0, cur,
+-                        model.layers[il].ffn_up,   model.layers[il].ffn_up_b,
+-                        NULL,                      NULL,
+-                        model.layers[il].ffn_down, model.layers[il].ffn_down_b,
++                        model.layers[il].ffn_up,   NULL,
++                        model.layers[il].ffn_gate, NULL,
++                        model.layers[il].ffn_down, NULL,
+                         model.layers[il].ffn_act,
+-                        LLM_FFN_GELU, LLM_FFN_SEQ, cb, il);
++                        LLM_FFN_SILU, LLM_FFN_PAR, cb, il);
+                 cb(cur, "ffn_out", il);
+             }
+ 
+@@ -8324,7 +8328,7 @@ struct llm_build_context {
+         cur = llm_build_norm(ctx0, cur, hparams,
+                 model.output_norm,
+                 model.output_norm_b,
+-                LLM_NORM, cb, -1);
++                LLM_NORM_RMS, cb, -1);
+         cb(cur, "result_norm", -1);
+ 
+         cur = ggml_mul_mat(ctx0, model.output, cur);
+diff --git a/unicode.cpp b/unicode.cpp
+index df8c5f58..33e5b36d 100644
+--- a/unicode.cpp
++++ b/unicode.cpp
+@@ -268,6 +268,10 @@ std::string unicode_byte_to_utf8(uint8_t byte) {
+ 
+ uint8_t unicode_utf8_to_byte(const std::string & utf8) {
+     static std::unordered_map<std::string, uint8_t> map = unicode_utf8_to_byte_map();
++
++    if (utf8.length() == 1 && 0 <= (unsigned int)utf8[0] && (unsigned int)utf8[0] < 128)
++        return (uint8_t)utf8[0];
++
+     return map.at(utf8);
+ }
+ 

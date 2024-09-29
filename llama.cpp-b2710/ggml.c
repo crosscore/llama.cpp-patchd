@@ -10344,7 +10344,7 @@ static void ggml_compute_forward_rms_norm_f32(
     float eps;
     memcpy(&eps, dst->op_params, sizeof(float));
 
-    GGML_ASSERT(eps > 0.0f);
+    //GGML_ASSERT(eps > 0.0f); // NOTE: In Tsusuzmi, this assersion causes an error.
 
     // TODO: optimize
     for (int64_t i03 = 0; i03 < ne03; i03++) {

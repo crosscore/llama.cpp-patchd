@@ -531,7 +531,9 @@ class MPTModel(Model):
         self.gguf_writer.add_context_length(self.hparams["max_seq_len"])
         self.gguf_writer.add_embedding_length(self.hparams["d_model"])
         self.gguf_writer.add_block_count(block_count)
-        self.gguf_writer.add_feed_forward_length(4 * self.hparams["d_model"])
+        # NOTE: For Tsuzumi
+        #self.gguf_writer.add_feed_forward_length(4 * self.hparams["d_model"])
+        self.gguf_writer.add_feed_forward_length(self.hparams["ffn_config"]["intermediate_size"])
         self.gguf_writer.add_head_count(self.hparams["n_heads"])
         if kv_n_heads := self.hparams["attn_config"].get("kv_n_heads"):
             self.gguf_writer.add_head_count_kv(kv_n_heads)

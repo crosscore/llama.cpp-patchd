@@ -264,6 +264,7 @@ class TensorNameMap:
             "model.layers.layers.{bid}.mlp.gate_proj",    # plamo
             "model.layers.{bid}.feed_forward.w1",         # internlm2
             "encoder.layers.{bid}.mlp.fc12",              # nomic-bert
+            "transformer.blocks.{bid}.ffn.gate_proj",     # mpt # NOTE: For Tsuzumi
         ),
 
         MODEL_TENSOR.FFN_GATE_EXP: (

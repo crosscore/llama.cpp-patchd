@@ -268,6 +268,10 @@ std::string unicode_byte_to_utf8(uint8_t byte) {
 
 uint8_t unicode_utf8_to_byte(const std::string & utf8) {
     static std::unordered_map<std::string, uint8_t> map = unicode_utf8_to_byte_map();
+
+    if (utf8.length() == 1 && 0 <= (unsigned int)utf8[0] && (unsigned int)utf8[0] < 128)
+        return (uint8_t)utf8[0];
+
     return map.at(utf8);
 }
 
