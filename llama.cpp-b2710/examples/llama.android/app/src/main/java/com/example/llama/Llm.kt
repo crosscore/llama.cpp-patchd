@@ -25,7 +25,7 @@ class Llm {
 
             // Set llama log handler to Android
             log_to_android()
-            backend_init(false)
+            backend_init()
 
             Log.d(tag, system_info())
 
@@ -44,7 +44,7 @@ class Llm {
     private external fun free_model(model: Long)
     private external fun new_context(model: Long): Long
     private external fun free_context(context: Long)
-    private external fun backend_init(numa: Boolean)
+    private external fun backend_init()// (numa: Boolean)
     private external fun backend_free()
     private external fun free_batch(batch: Long)
     private external fun new_batch(nTokens: Int, embd: Int, nSeqMax: Int): Long

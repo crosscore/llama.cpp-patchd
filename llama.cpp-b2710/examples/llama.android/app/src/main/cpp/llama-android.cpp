@@ -1,29 +1,11 @@
 #include <android/log.h>
 #include <jni.h>
 #include <iomanip>
-#include <math.h>
+#include <cmath>
 #include <string>
 #include <unistd.h>
 #include "llama.h"
 #include "common.h"
-
-// Write C++ code here.
-//
-// Do not forget to dynamically load the C++ library into your application.
-//
-// For instance,
-//
-// In MainActivity.java:
-//    static {
-//       System.loadLibrary("llama-android");
-//    }
-//
-// Or, in MainActivity.kt:
-//    companion object {
-//      init {
-//         System.loadLibrary("llama-android")
-//      }
-//    }
 
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
@@ -40,7 +22,7 @@ bool is_valid_utf8(const char * string) {
         return true;
     }
 
-    const unsigned char * bytes = (const unsigned char *)string;
+    const auto * bytes = (const unsigned char *)string;
     int num;
 
     while (*bytes != 0x00) {
@@ -73,21 +55,22 @@ bool is_valid_utf8(const char * string) {
 }
 
 static void log_callback(ggml_log_level level, const char * fmt, void * data) {
-    if (level == GGML_LOG_LEVEL_ERROR)     __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
-    else if (level == GGML_LOG_LEVEL_INFO) __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
-    else if (level == GGML_LOG_LEVEL_WARN) __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
-    else __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
+    if (level == GGML_LOG_LEVEL_ERROR) {     __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
+    } else if (level == GGML_LOG_LEVEL_INFO) { __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
+    } else if (level == GGML_LOG_LEVEL_WARN) { __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
+    } else { __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
+    }
 }
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject, jstring filename) {
+Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject /*unused*/, jstring filename) {
     llama_model_params model_params = llama_model_default_params();
 
-    auto path_to_model = env->GetStringUTFChars(filename, 0);
+    const auto *path_to_model = env->GetStringUTFChars(filename, nullptr);
     LOGi("Loading model from %s", path_to_model);
 
-    auto model = llama_load_model_from_file(path_to_model, model_params);
+    auto *model = llama_load_model_from_file(path_to_model, model_params);
     env->ReleaseStringUTFChars(filename, path_to_model);
 
     if (!model) {
@@ -101,14 +84,14 @@ Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject, jstring filename) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_free_1model(JNIEnv *, jobject, jlong model) {
-    llama_free_model(reinterpret_cast<llama_model *>(model));
+Java_com_example_llama_Llm_free_1model(JNIEnv * /*unused*/, jobject /*unused*/, jlong model) {
+    llama_free_model(reinterpret_cast<llama_model *>(model)); // NOLINT(*-no-int-to-ptr)
 }
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject, jlong jmodel) {
-    auto model = reinterpret_cast<llama_model *>(jmodel);
+Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel) {
+    auto *model = reinterpret_cast<llama_model *>(jmodel); // NOLINT(*-no-int-to-ptr)
 
     if (!model) {
         LOGe("new_context(): model cannot be null");
@@ -120,7 +103,7 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject, jlong jmodel) {
     LOGi("Using %d threads", n_threads);
 
     llama_context_params ctx_params = llama_context_default_params();
-    ctx_params.seed  = 1234;
+    // ctx_params.seed  = 1234;
     ctx_params.n_ctx = 2048;
     ctx_params.n_threads       = n_threads;
     ctx_params.n_threads_batch = n_threads;
@@ -139,27 +122,27 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject, jlong jmodel) {
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_free_1context(JNIEnv *, jobject, jlong context) {
-    llama_free(reinterpret_cast<llama_context *>(context));
+Java_com_example_llama_Llm_free_1context(JNIEnv * /*unused*/, jobject /*unused*/, jlong context) {
+    llama_free(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_backend_1free(JNIEnv *, jobject) {
+Java_com_example_llama_Llm_backend_1free(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_free();
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_log_1to_1android(JNIEnv *, jobject) {
-    llama_log_set(log_callback, NULL);
+Java_com_example_llama_Llm_log_1to_1android(JNIEnv * /*unused*/, jobject /*unused*/) {
+    llama_log_set(log_callback, nullptr);
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_bench_1model(
         JNIEnv *env,
-        jobject,
+        jobject /*unused*/,
         jlong context_pointer,
         jlong model_pointer,
         jlong batch_pointer,
@@ -173,15 +156,16 @@ Java_com_example_llama_Llm_bench_1model(
     auto pp_std = 0.0;
     auto tg_std = 0.0;
 
-    const auto context = reinterpret_cast<llama_context *>(context_pointer);
-    const auto model = reinterpret_cast<llama_model *>(model_pointer);
-    const auto batch = reinterpret_cast<llama_batch *>(batch_pointer);
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const model = reinterpret_cast<llama_model *>(model_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
 
     const int n_ctx = llama_n_ctx(context);
 
     LOGi("n_ctx = %d", n_ctx);
 
-    int i, j;
+    int i;
+    int j;
     int nri;
     for (nri = 0; nri < nr; nri++) {
         LOGi("Benchmark prompt processing (pp)");
@@ -257,7 +241,7 @@ Java_com_example_llama_Llm_bench_1model(
     const auto model_size     = double(llama_model_size(model)) / 1024.0 / 1024.0 / 1024.0;
     const auto model_n_params = double(llama_model_n_params(model)) / 1e9;
 
-    const auto backend    = "(Android)"; // TODO: What should this be?
+    const auto *const backend    = "(Android)"; // TODO: What should this be?
 
     std::stringstream result;
     result << std::setprecision(2);
@@ -271,17 +255,17 @@ Java_com_example_llama_Llm_bench_1model(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_free_1batch(JNIEnv *, jobject, jlong batch_pointer) {
-    llama_batch_free(*reinterpret_cast<llama_batch *>(batch_pointer));
+Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jlong batch_pointer) {
+    llama_batch_free(*reinterpret_cast<llama_batch *>(batch_pointer)); // NOLINT(*-no-int-to-ptr)
 }
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_new_1batch(JNIEnv *, jobject, jint n_tokens, jint embd, jint n_seq_max) {
+Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jint n_tokens, jint embd, jint n_seq_max) {
 
     // Source: Copy of llama.cpp:llama_batch_init but heap-allocated.
 
-    llama_batch *batch = new llama_batch {
+    auto *batch = new llama_batch {
         0,
         nullptr,
         nullptr,
@@ -313,13 +297,13 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv *, jobject, jint n_tokens, jint emb
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_backend_1init(JNIEnv *, jobject) {
+Java_com_example_llama_Llm_backend_1init(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_init();
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
-Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject) {
+Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject /*unused*/) {
     return env->NewStringUTF(llama_print_system_info());
 }
 
@@ -327,7 +311,7 @@ extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_llama_Llm_completion_1init(
         JNIEnv *env,
-        jobject,
+        jobject /*unused*/,
         jlong context_pointer,
         jlong batch_pointer,
         jstring jtext,
@@ -336,11 +320,11 @@ Java_com_example_llama_Llm_completion_1init(
 
     cached_token_chars.clear();
 
-    const auto text = env->GetStringUTFChars(jtext, 0);
-    const auto context = reinterpret_cast<llama_context *>(context_pointer);
-    const auto batch = reinterpret_cast<llama_batch *>(batch_pointer);
+    const auto *const text = env->GetStringUTFChars(jtext, nullptr);
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
 
-    const auto tokens_list = llama_tokenize(context, text, 1);
+    const auto tokens_list = llama_tokenize(context, text, true);
 
     auto n_ctx = llama_n_ctx(context);
     auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
@@ -378,22 +362,22 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_completion_1loop(
         JNIEnv * env,
-        jobject,
+        jobject /*unused*/,
         jlong context_pointer,
         jlong batch_pointer,
         jint n_len,
         jobject intvar_ncur
 ) {
-    const auto context = reinterpret_cast<llama_context *>(context_pointer);
-    const auto batch = reinterpret_cast<llama_batch *>(batch_pointer);
-    const auto model = llama_get_model(context);
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
+    const auto *const model = llama_get_model(context);
 
-    if (!la_int_var) la_int_var = env->GetObjectClass(intvar_ncur);
-    if (!la_int_var_value) la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I");
-    if (!la_int_var_inc) la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V");
+    if (!la_int_var) { la_int_var = env->GetObjectClass(intvar_ncur);}
+    if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I");}
+    if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V");}
 
     auto n_vocab = llama_n_vocab(model);
-    auto logits = llama_get_logits_ith(context, batch->n_tokens - 1);
+    auto *logits = llama_get_logits_ith(context, batch->n_tokens - 1);
 
     std::vector<llama_token_data> candidates;
     candidates.reserve(n_vocab);
@@ -438,6 +422,6 @@ Java_com_example_llama_Llm_completion_1loop(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv *, jobject, jlong context) {
-    llama_kv_cache_clear(reinterpret_cast<llama_context *>(context));
+Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unused*/, jlong context) {
+    llama_kv_cache_clear(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }

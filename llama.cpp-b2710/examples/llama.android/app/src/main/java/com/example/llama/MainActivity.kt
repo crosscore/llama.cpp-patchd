@@ -68,7 +68,7 @@ class MainActivity(
                 file.name,
                 Uri.EMPTY,
                 file,
-                sha256 = "" // ダウンロード済みモデルのSHA256は空文字列とする
+                sha256 = "" // ダウンロード済みモデルのSHA256は空文字列
             )
         } ?: emptyList()
 
