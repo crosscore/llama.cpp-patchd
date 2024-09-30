@@ -1,3 +1,4 @@
+//　llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainActivity.kt
 package com.example.llama
 
 import android.app.ActivityManager
