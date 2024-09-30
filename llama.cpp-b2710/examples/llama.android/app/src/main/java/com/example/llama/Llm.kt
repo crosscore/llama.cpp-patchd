@@ -4,6 +4,8 @@ package com.example.llama
 import android.util.Log
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -51,7 +53,6 @@ class Llm {
     private external fun bench_model(
         context: Long,
         model: Long,
-        batch: Long,
         pp: Int,
         tg: Int,
         pl: Int,
@@ -81,7 +82,12 @@ class Llm {
             when (val state = threadLocalState.get()) {
                 is State.Loaded -> {
                     Log.d(tag, "bench(): $state")
-                    bench_model(state.context, state.model, state.batch, pp, tg, pl, nr)
+                    // ローカルでバッチを生成
+                    val batch = new_batch(512, 0, 1)
+                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
+                    val result = bench_model(state.context, state.model, pp, tg, pl, nr)
+                    free_batch(batch)
+                    result
                 }
 
                 else -> throw IllegalStateException("No model loaded")
@@ -100,11 +106,8 @@ class Llm {
             val context = new_context(model)
             if (context == 0L) throw IllegalStateException("new_context() failed")
 
-            val batch = new_batch(512, 0, 1)
-            if (batch == 0L) throw IllegalStateException("new_batch() failed")
-
             Log.i(tag, "Loaded model $pathToModel")
-            threadLocalState.set(State.Loaded(model, context, batch))
+            threadLocalState.set(State.Loaded(model, context))
         }
     }
 
@@ -112,15 +115,22 @@ class Llm {
         val state = threadLocalState.get()
         when (state) {
             is State.Loaded -> {
-                val ncur = IntVar(completion_init(state.context, state.batch, message, nlen))
+                val batch = new_batch(512, 0, 1)
+                if (batch == 0L) throw IllegalStateException("new_batch() failed")
+
+                val ncur = IntVar(completion_init(state.context, batch, message, nlen))
                 while (ncur.value <= nlen) {
-                    val str = completion_loop(state.context, state.batch, nlen, ncur)
+                    // キャンセルが発生していないか確認
+                    currentCoroutineContext().ensureActive()
+
+                    val str = completion_loop(state.context, batch, nlen, ncur)
                     if (str == null) {
                         break
                     }
                     emit(str)
                 }
                 kv_cache_clear(state.context)
+                free_batch(batch)
             }
             else -> {}
         }
@@ -140,9 +150,9 @@ class Llm {
     private fun unloadInternal() {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
+                // `batch` は各関数でローカルに解放されるため、ここでの解放は不要
                 free_context(state.context)
                 free_model(state.model)
-                free_batch(state.batch)
 
                 threadLocalState.set(State.Idle)
             }
@@ -165,9 +175,10 @@ class Llm {
 
         private sealed interface State {
             data object Idle: State
-            data class Loaded(val model: Long, val context: Long, val batch: Long): State
+            data class Loaded(val model: Long, val context: Long): State
         }
 
+        // Llmのインスタンスは1つだけにします。
         private val _instance: Llm = Llm()
 
         fun instance(): Llm = _instance

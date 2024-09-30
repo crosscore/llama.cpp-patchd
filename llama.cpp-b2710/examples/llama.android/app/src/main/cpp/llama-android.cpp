@@ -268,7 +268,9 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
                                        jlong batch_pointer) {
-    llama_batch_free(*reinterpret_cast<llama_batch *>(batch_pointer)); // NOLINT(*-no-int-to-ptr)
+    auto *batch = reinterpret_cast<llama_batch *>(batch_pointer);
+    llama_batch_free(*batch);
+    delete batch;
 }
 
 extern "C"
