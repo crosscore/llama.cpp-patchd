@@ -8,6 +8,10 @@
 #include "llama.h"
 #include "common.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
@@ -18,12 +22,12 @@ jmethodID la_int_var_inc;
 
 std::string cached_token_chars;
 
-bool is_valid_utf8(const char * string) {
+bool is_valid_utf8(const char *string) {
     if (!string) {
         return true;
     }
 
-    const auto * bytes = (const unsigned char *)string;
+    const auto *bytes = (const unsigned char *) string;
     int num;
 
     while (*bytes != 0x00) {
@@ -55,11 +59,15 @@ bool is_valid_utf8(const char * string) {
     return true;
 }
 
-static void log_callback(ggml_log_level level, const char * fmt, void * data) {
-    if (level == GGML_LOG_LEVEL_ERROR) {     __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
-    } else if (level == GGML_LOG_LEVEL_INFO) { __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
-    } else if (level == GGML_LOG_LEVEL_WARN) { __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
-    } else { __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
+static void log_callback(ggml_log_level level, const char *fmt, void *data) {
+    if (level == GGML_LOG_LEVEL_ERROR) {
+        __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
+    } else if (level == GGML_LOG_LEVEL_INFO) {
+        __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
+    } else if (level == GGML_LOG_LEVEL_WARN) {
+        __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
+    } else {
+        __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
     }
 }
 
@@ -106,10 +114,10 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong j
     llama_context_params ctx_params = llama_context_default_params();
     // ctx_params.seed  = 1234;
     ctx_params.n_ctx = 2048;
-    ctx_params.n_threads       = n_threads;
+    ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
-    llama_context * context = llama_new_context_with_model(model, ctx_params);
+    llama_context *context = llama_new_context_with_model(model, ctx_params);
 
     if (!context) {
         LOGe("llama_new_context_with_model() returned null)");
@@ -151,7 +159,7 @@ Java_com_example_llama_Llm_bench_1model(
         jint tg,
         jint pl,
         jint nr
-        ) {
+) {
     auto pp_avg = 0.0;
     auto tg_avg = 0.0;
     auto pp_std = 0.0;
@@ -175,7 +183,7 @@ Java_com_example_llama_Llm_bench_1model(
 
         const int n_tokens = pp;
         for (i = 0; i < n_tokens; i++) {
-            llama_batch_add(*batch, 0, i, { 0 }, false);
+            llama_batch_add(*batch, 0, i, {0}, false);
         }
 
         batch->logits[batch->n_tokens - 1] = true;
@@ -197,7 +205,7 @@ Java_com_example_llama_Llm_bench_1model(
 
             llama_batch_clear(*batch);
             for (j = 0; j < pl; j++) {
-                llama_batch_add(*batch, 0, i, { j }, true);
+                llama_batch_add(*batch, 0, i, {j}, true);
             }
 
             LOGi("llama_decode() text generation: %d", i);
@@ -239,44 +247,48 @@ Java_com_example_llama_Llm_bench_1model(
     char model_desc[128];
     llama_model_desc(model, model_desc, sizeof(model_desc));
 
-    const auto model_size     = double(llama_model_size(model)) / 1024.0 / 1024.0 / 1024.0;
+    const auto model_size = double(llama_model_size(model)) / 1024.0 / 1024.0 / 1024.0;
     const auto model_n_params = double(llama_model_n_params(model)) / 1e9;
 
-    const auto *const backend    = "(Android)"; // TODO: What should this be?
+    const auto *const backend = "(Android)"; // TODO: What should this be?
 
     std::stringstream result;
     result << std::setprecision(2);
     result << "| model | size | params | backend | test | t/s |\n";
     result << "| --- | --- | --- | --- | --- | --- |\n";
-    result << "| " << model_desc << " | " << model_size << "GiB | " << model_n_params << "B | " << backend << " | pp " << pp << " | " << pp_avg << " ± " << pp_std << " |\n";
-    result << "| " << model_desc << " | " << model_size << "GiB | " << model_n_params << "B | " << backend << " | tg " << tg << " | " << tg_avg << " ± " << tg_std << " |\n";
+    result << "| " << model_desc << " | " << model_size << "GiB | " << model_n_params << "B | "
+           << backend << " | pp " << pp << " | " << pp_avg << " ± " << pp_std << " |\n";
+    result << "| " << model_desc << " | " << model_size << "GiB | " << model_n_params << "B | "
+           << backend << " | tg " << tg << " | " << tg_avg << " ± " << tg_std << " |\n";
 
     return env->NewStringUTF(result.str().c_str());
 }
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jlong batch_pointer) {
+Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
+                                       jlong batch_pointer) {
     llama_batch_free(*reinterpret_cast<llama_batch *>(batch_pointer)); // NOLINT(*-no-int-to-ptr)
 }
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jint n_tokens, jint embd, jint n_seq_max) {
+Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jint n_tokens,
+                                      jint embd, jint n_seq_max) {
 
     // Source: Copy of llama.cpp:llama_batch_init but heap-allocated.
 
-    auto *batch = new llama_batch {
-        0,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        nullptr,
-        0,
-        0,
-        0,
+    auto *batch = new llama_batch{
+            0,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            0,
+            0,
+            0,
     };
 
     if (embd) {
@@ -285,13 +297,13 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
         batch->token = (llama_token *) malloc(sizeof(llama_token) * n_tokens);
     }
 
-    batch->pos      = (llama_pos *)     malloc(sizeof(llama_pos)      * n_tokens);
-    batch->n_seq_id = (int32_t *)       malloc(sizeof(int32_t)        * n_tokens);
-    batch->seq_id   = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * n_tokens);
+    batch->pos = (llama_pos *) malloc(sizeof(llama_pos) * n_tokens);
+    batch->n_seq_id = (int32_t *) malloc(sizeof(int32_t) * n_tokens);
+    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * n_tokens);
     for (int i = 0; i < n_tokens; ++i) {
         batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
     }
-    batch->logits   = (int8_t *)        malloc(sizeof(int8_t)         * n_tokens);
+    batch->logits = (int8_t *) malloc(sizeof(int8_t) * n_tokens);
 
     return reinterpret_cast<jlong>(batch);
 }
@@ -317,7 +329,7 @@ Java_com_example_llama_Llm_completion_1init(
         jlong batch_pointer,
         jstring jtext,
         jint n_len
-    ) {
+) {
 
     cached_token_chars.clear();
 
@@ -336,7 +348,7 @@ Java_com_example_llama_Llm_completion_1init(
         LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");
     }
 
-    for (auto id : tokens_list) {
+    for (auto id: tokens_list) {
         LOGi("%s", llama_token_to_piece(context, id).c_str());
     }
 
@@ -344,7 +356,7 @@ Java_com_example_llama_Llm_completion_1init(
 
     // evaluate the initial prompt
     for (auto i = 0; i < tokens_list.size(); i++) {
-        llama_batch_add(*batch, tokens_list[i], i, { 0 }, false);
+        llama_batch_add(*batch, tokens_list[i], i, {0}, false);
     }
 
     // llama_decode will output logits only for the last token of the prompt
@@ -362,7 +374,7 @@ Java_com_example_llama_Llm_completion_1init(
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_completion_1loop(
-        JNIEnv * env,
+        JNIEnv *env,
         jobject /*unused*/,
         jlong context_pointer,
         jlong batch_pointer,
@@ -373,9 +385,9 @@ Java_com_example_llama_Llm_completion_1loop(
     auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
     const auto *const model = llama_get_model(context);
 
-    if (!la_int_var) { la_int_var = env->GetObjectClass(intvar_ncur);}
-    if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I");}
-    if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V");}
+    if (!la_int_var) { la_int_var = env->GetObjectClass(intvar_ncur); }
+    if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I"); }
+    if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V"); }
 
     auto n_vocab = llama_n_vocab(model);
     auto *logits = llama_get_logits_ith(context, batch->n_tokens - 1);
@@ -384,10 +396,10 @@ Java_com_example_llama_Llm_completion_1loop(
     candidates.reserve(n_vocab);
 
     for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-        candidates.emplace_back(llama_token_data{ token_id, logits[token_id], 0.0f });
+        candidates.emplace_back(llama_token_data{token_id, logits[token_id], 0.0f});
     }
 
-    llama_token_data_array candidates_p = { candidates.data(), candidates.size(), false };
+    llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
 
     // sample the most likely token
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
@@ -403,14 +415,15 @@ Java_com_example_llama_Llm_completion_1loop(
     jstring new_token = nullptr;
     if (is_valid_utf8(cached_token_chars.c_str())) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(), new_token_chars.c_str(), new_token_id);
+        LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(),
+             new_token_chars.c_str(), new_token_id);
         cached_token_chars.clear();
     } else {
         new_token = env->NewStringUTF("");
     }
 
     llama_batch_clear(*batch);
-    llama_batch_add(*batch, new_token_id, n_cur, { 0 }, true);
+    llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
 
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
 
@@ -423,6 +436,11 @@ Java_com_example_llama_Llm_completion_1loop(
 
 extern "C"
 JNIEXPORT void JNICALL
-Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unused*/, jlong context) {
+Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unused*/,
+                                            jlong context) {
     llama_kv_cache_clear(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
+
+#ifdef __cplusplus
+}
+#endif
