@@ -44,7 +44,7 @@ class Llm {
     private external fun free_model(model: Long)
     private external fun new_context(model: Long): Long
     private external fun free_context(context: Long)
-    private external fun backend_init()// (numa: Boolean)
+    private external fun backend_init()
     private external fun backend_free()
     private external fun free_batch(batch: Long)
     private external fun new_batch(nTokens: Int, embd: Int, nSeqMax: Int): Long
@@ -91,27 +91,26 @@ class Llm {
 
     suspend fun load(pathToModel: String) {
         withContext(runLoop) {
-            when (threadLocalState.get()) {
-                is State.Idle -> {
-                    val model = load_model(pathToModel)
-                    if (model == 0L)  throw IllegalStateException("load_model() failed")
+            // 現在のモデルをアンロード
+            unloadInternal()
+            // 新しいモデルをロード
+            val model = load_model(pathToModel)
+            if (model == 0L)  throw IllegalStateException("load_model() failed")
 
-                    val context = new_context(model)
-                    if (context == 0L) throw IllegalStateException("new_context() failed")
+            val context = new_context(model)
+            if (context == 0L) throw IllegalStateException("new_context() failed")
 
-                    val batch = new_batch(512, 0, 1)
-                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
+            val batch = new_batch(512, 0, 1)
+            if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
-                    Log.i(tag, "Loaded model $pathToModel")
-                    threadLocalState.set(State.Loaded(model, context, batch))
-                }
-                else -> throw IllegalStateException("Model already loaded")
-            }
+            Log.i(tag, "Loaded model $pathToModel")
+            threadLocalState.set(State.Loaded(model, context, batch))
         }
     }
 
     fun send(message: String): Flow<String> = flow {
-        when (val state = threadLocalState.get()) {
+        val state = threadLocalState.get()
+        when (state) {
             is State.Loaded -> {
                 val ncur = IntVar(completion_init(state.context, state.batch, message, nlen))
                 while (ncur.value <= nlen) {
@@ -128,22 +127,26 @@ class Llm {
     }.flowOn(runLoop)
 
     /**
-     * Unloads the model and frees resources.
+     * モデルをアンロードしてリソースを解放します。
      *
-     * This is a no-op if there's no model loaded.
+     * モデルがロードされていない場合、この関数は何もしません。
      */
     suspend fun unload() {
         withContext(runLoop) {
-            when (val state = threadLocalState.get()) {
-                is State.Loaded -> {
-                    free_context(state.context)
-                    free_model(state.model)
-                    free_batch(state.batch)
+            unloadInternal()
+        }
+    }
 
-                    threadLocalState.set(State.Idle)
-                }
-                else -> {}
+    private fun unloadInternal() {
+        when (val state = threadLocalState.get()) {
+            is State.Loaded -> {
+                free_context(state.context)
+                free_model(state.model)
+                free_batch(state.batch)
+
+                threadLocalState.set(State.Idle)
             }
+            else -> {}
         }
     }
 
@@ -165,7 +168,6 @@ class Llm {
             data class Loaded(val model: Long, val context: Long, val batch: Long): State
         }
 
-        // Enforce only one instance of Llm.
         private val _instance: Llm = Llm()
 
         fun instance(): Llm = _instance
