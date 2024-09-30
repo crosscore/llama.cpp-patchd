@@ -120,7 +120,7 @@ class Llm {
 
                 val ncur = IntVar(completion_init(state.context, batch, message, nlen))
                 while (ncur.value <= nlen) {
-                    // キャンセルが発生していないか確認
+                    // コルーチンのキャンセルが発生した場合即座に中断
                     currentCoroutineContext().ensureActive()
 
                     val str = completion_loop(state.context, batch, nlen, ncur)
@@ -136,11 +136,6 @@ class Llm {
         }
     }.flowOn(runLoop)
 
-    /**
-     * モデルをアンロードしてリソースを解放します。
-     *
-     * モデルがロードされていない場合、この関数は何もしません。
-     */
     suspend fun unload() {
         withContext(runLoop) {
             unloadInternal()
@@ -180,7 +175,6 @@ class Llm {
 
         // Llmのインスタンスは1つだけにします。
         private val _instance: Llm = Llm()
-
         fun instance(): Llm = _instance
     }
 }
