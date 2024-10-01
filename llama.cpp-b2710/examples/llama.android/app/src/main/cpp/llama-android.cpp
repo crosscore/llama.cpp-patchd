@@ -301,10 +301,11 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
 
     batch->pos = (llama_pos *) malloc(sizeof(llama_pos) * n_tokens);
     batch->n_seq_id = (int32_t *) malloc(sizeof(int32_t) * n_tokens);
-    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * n_tokens);
+    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (n_tokens + 1)); // NOTE: n_tokens + 1
     for (int i = 0; i < n_tokens; ++i) {
         batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
     }
+    batch->seq_id[n_tokens] = nullptr; // NOTE: Add this line
     batch->logits = (int8_t *) malloc(sizeof(int8_t) * n_tokens);
 
     return reinterpret_cast<jlong>(batch);
