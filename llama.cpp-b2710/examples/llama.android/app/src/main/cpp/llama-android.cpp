@@ -300,7 +300,7 @@ Java_com_example_llama_Llm_completion_1loop(
     auto new_token_chars = llama_token_to_piece(context, new_token_id);
     cached_token_chars += new_token_chars;
 
-    jstring new_token = nullptr;
+    jstring new_token; // 初期化を削除
     if (is_valid_utf8(cached_token_chars.c_str())) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
         LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(),
