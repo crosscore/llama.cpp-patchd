@@ -153,6 +153,15 @@ fun MainCompose(
                 .padding(vertical = 8.dp)
         )
 
+        OutlinedTextField(
+            value = viewModel.maxTokens.toString(),
+            onValueChange = { viewModel.updateMaxTokens(it) },
+            label = { Text("MaxTokens") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()

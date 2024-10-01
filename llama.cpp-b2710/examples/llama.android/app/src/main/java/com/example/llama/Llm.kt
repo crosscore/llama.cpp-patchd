@@ -39,8 +39,6 @@ class Llm {
         }
     }.asCoroutineDispatcher()
 
-    private val nlen: Int = 64
-
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
     private external fun free_model(model: Long)
@@ -111,20 +109,19 @@ class Llm {
         }
     }
 
-    fun send(message: String): Flow<String> = flow {
+    suspend fun send(message: String, nLen: Int): Flow<String> = flow {
         val state = threadLocalState.get()
-        when (state) {
-            is State.Loaded -> {
+        when {
+            state is State.Loaded -> {
                 val batch = new_batch(512, 0, 1)
                 if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
-                val ncur = IntVar(completion_init(state.context, batch, message, nlen))
-                while (ncur.value <= nlen) {
-                    // コルーチンのキャンセルが発生した場合即座に中断
+                val ncur = IntVar(completion_init(state.context, batch, message, nLen))
+                while (ncur.value <= nLen) {
                     currentCoroutineContext().ensureActive()
 
-                    val str = completion_loop(state.context, batch, nlen, ncur)
-                    if (str == null) {
+                    val str = completion_loop(state.context, batch, nLen, ncur)
+                    if (str.isNullOrEmpty()) {
                         break
                     }
                     emit(str)

@@ -51,26 +51,35 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
+    var maxTokens by mutableStateOf(16)
+        private set
+
+    fun updateMaxTokens(newMaxTokens: String) {
+        maxTokens = newMaxTokens.toIntOrNull() ?: 16
+    }
+
     fun send() {
         val text = message.trim()
         if (text.isEmpty()) return
         message = ""
 
-        messages += text
-        messages += ""
+        messages += "User: $text"
+        messages += "LLM: "
 
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
             try {
-                llm.send(text)
+                llm.send(text, maxTokens)
                     .catch { e ->
                         Log.e(tag, "send() failed", e)
-                        messages = messages.dropLast(1) + e.message!!
+                        messages = messages.dropLast(1) + ("LLM: " + e.message!!)
                     }
                     .collect { token ->
                         responseBuilder.append(token)
-                        messages = messages.dropLast(1) + responseBuilder.toString()
+                        messages = messages.dropLast(1) + ("LLM: $responseBuilder")
                     }
+                // 2. LLMの最終トークン出力後に完了を示す文字列を追加
+                messages += "[Output Completed]"
             } catch (e: CancellationException) {
                 Log.i(tag, "send() canceled")
                 messages += "Operation canceled."
