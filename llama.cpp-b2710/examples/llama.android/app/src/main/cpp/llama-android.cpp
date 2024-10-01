@@ -8,13 +8,27 @@
 #include "llama.h"
 #include "common.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+namespace {
+    extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
+        if (level == GGML_LOG_LEVEL_ERROR) {
+            __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
+        } else if (level == GGML_LOG_LEVEL_INFO) {
+            __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
+        } else if (level == GGML_LOG_LEVEL_WARN) {
+            __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
+        } else {
+            __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
+        }
+    }
+}
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 jclass la_int_var;
 jmethodID la_int_var_value;
@@ -57,18 +71,6 @@ bool is_valid_utf8(const char *string) {
     }
 
     return true;
-}
-
-static void log_callback(ggml_log_level level, const char *fmt, void *data) {
-    if (level == GGML_LOG_LEVEL_ERROR) {
-        __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
-    } else if (level == GGML_LOG_LEVEL_INFO) {
-        __android_log_print(ANDROID_LOG_INFO, TAG, fmt, data);
-    } else if (level == GGML_LOG_LEVEL_WARN) {
-        __android_log_print(ANDROID_LOG_WARN, TAG, fmt, data);
-    } else {
-        __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
-    }
 }
 
 extern "C"
