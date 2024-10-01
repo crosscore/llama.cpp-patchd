@@ -3,6 +3,7 @@ package com.example.llama
 
 import android.util.Log
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -13,10 +14,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
-    companion object {
-        @JvmStatic
-        private val NanosPerSecond = 1_000_000_000.0
-    }
 
     private val tag: String? = this::class.simpleName
 
@@ -51,7 +48,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
-    var maxTokens by mutableStateOf(16)
+    var maxTokens by mutableIntStateOf(16)
         private set
 
     fun updateMaxTokens(newMaxTokens: String) {
@@ -86,31 +83,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             } catch (e: Exception) {
                 Log.e(tag, "send() failed", e)
                 messages += "Error: ${e.message ?: "Unknown error"}"
-            }
-        }
-    }
-
-    fun bench(pp: Int, tg: Int, pl: Int, nr: Int = 1) {
-        viewModelScope.launch {
-            try {
-                val start = System.nanoTime()
-                val warmupResult = llm.bench(pp, tg, pl, nr)
-                val end = System.nanoTime()
-
-                messages += warmupResult
-
-                val warmup = (end - start).toDouble() / NanosPerSecond
-                messages += "Warm up time: $warmup seconds, please wait..."
-
-                if (warmup > 5.0) {
-                    messages += "Warm up took too long, aborting benchmark"
-                    return@launch
-                }
-
-                messages += llm.bench(512, 128, 1, 3)
-            } catch (exc: IllegalStateException) {
-                Log.e(tag, "bench() failed", exc)
-                messages += exc.message!!
             }
         }
     }

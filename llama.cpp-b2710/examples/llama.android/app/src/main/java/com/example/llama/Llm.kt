@@ -49,14 +49,6 @@ class Llm {
     private external fun backend_free()
     private external fun free_batch(batch: Long)
     private external fun new_batch(nTokens: Int, embd: Int, nSeqMax: Int): Long
-    private external fun bench_model(
-        context: Long,
-        model: Long,
-        pp: Int,
-        tg: Int,
-        pl: Int,
-        nr: Int
-    ): String
 
     private external fun system_info(): String
 
@@ -75,24 +67,6 @@ class Llm {
     ): String?
 
     private external fun kv_cache_clear(context: Long)
-
-    suspend fun bench(pp: Int, tg: Int, pl: Int, nr: Int = 1): String {
-        return withContext(runLoop) {
-            when (val state = threadLocalState.get()) {
-                is State.Loaded -> {
-                    Log.d(tag, "bench(): $state")
-                    // ローカルでバッチを生成
-                    val batch = new_batch(512, 0, 1)
-                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
-                    val result = bench_model(state.context, state.model, pp, tg, pl, nr)
-                    free_batch(batch)
-                    result
-                }
-
-                else -> throw IllegalStateException("No model loaded")
-            }
-        }
-    }
 
     suspend fun load(pathToModel: String) {
         withContext(runLoop) {

@@ -169,7 +169,6 @@ fun MainCompose(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(onClick = { viewModel.send() }) { Text("Send") }
-            Button(onClick = { viewModel.bench(8, 4, 1) }) { Text("Bench") }
             Button(onClick = { viewModel.clear() }) { Text("Clear") }
             Button(onClick = {
                 viewModel.messages.joinToString("\n").let {
