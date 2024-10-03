@@ -86,22 +86,30 @@ class Llm {
         }
     }
 
+    // MaxTokensに達したことを示す例外を定義
+    class MaxTokensReachedException : Exception("Max tokens limit reached")
+
     suspend fun send(message: String, nLen: Int): Flow<String> = flow {
         val state = threadLocalState.get()
-        when {
-            state is State.Loaded -> {
+        when (state) {
+            is State.Loaded -> {
                 val batch = new_batch(512, 0, 1)
                 if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                 val ncur = IntVar(completion_init(state.context, batch, message, nLen))
-                while (ncur.value <= nLen) {
+                while (true) {
                     currentCoroutineContext().ensureActive()
 
                     val str = completion_loop(state.context, batch, nLen, ncur)
-                    if (str.isNullOrEmpty()) {
+                    if (str == null || str == "\n" || str.isEmpty() || str == "<EOS_TOKEN_DETECTED>") {
+                        // EOSトークンにより終了
                         break
+                    } else if (str == "<MAX_TOKENS_REACHED>") {
+                        // MaxTokensに達した場合、例外を投げる
+                        throw MaxTokensReachedException()
+                    } else {
+                        emit(str)
                     }
-                    emit(str)
                 }
                 kv_cache_clear(state.context)
                 free_batch(batch)

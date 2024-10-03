@@ -292,23 +292,35 @@ Java_com_example_llama_Llm_completion_1loop(
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
 
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
-    if (llama_token_is_eog(model, new_token_id) || n_cur == n_len) {
-        return env->NewStringUTF("");
+
+    // EOSトークンの検出
+    if (llama_token_is_eog(model, new_token_id)) {
+        // EOSトークンが出力された場合、空文字列を返す
+        LOGi("Detected EOS TOKEN");
+        return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
+    // MaxTokensに達した場合の処理
+    if (n_cur >= n_len) {
+        // 特別な文字列を返す
+        LOGi("MAX_TOKENS_REACHED");
+        return env->NewStringUTF("<MAX_TOKENS_REACHED>");
+    }
+
+    // トークンの処理
     auto new_token_chars = llama_token_to_piece(context, new_token_id);
     cached_token_chars += new_token_chars;
 
-    jstring new_token; // 初期化を削除
+    jstring new_token;
     if (is_valid_utf8(cached_token_chars.c_str())) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("cached: %s, new_token_chars: `%s`, id: %d", cached_token_chars.c_str(),
-             new_token_chars.c_str(), new_token_id);
+        LOGi("cached_token: %s, new_token: %s, token_id: %d", cached_token_chars.c_str(), new_token_chars.c_str(), new_token_id);
         cached_token_chars.clear();
     } else {
         new_token = env->NewStringUTF("");
     }
 
+    // バッチの更新
     llama_batch_clear(*batch);
     llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
 

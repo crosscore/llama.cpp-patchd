@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
 
 class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
@@ -31,6 +32,9 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         private set
 
     var currentModelPath: String? by mutableStateOf(null)
+        private set
+
+    var maxTokens by mutableIntStateOf(32)
         private set
 
     var seed by mutableIntStateOf(42)
@@ -60,6 +64,10 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     }
 
     // 値を更新する関数
+    fun updateMaxTokens(newMaxTokens: String) {
+        maxTokens = newMaxTokens.toIntOrNull() ?: 32
+    }
+
     fun updateSeed(newSeed: String) {
         seed = newSeed.toIntOrNull() ?: 42
     }
@@ -72,37 +80,48 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         numThreads = newNumThreads.toIntOrNull() ?: 4
     }
 
-    var maxTokens by mutableIntStateOf(16)
-        private set
-
-    fun updateMaxTokens(newMaxTokens: String) {
-        maxTokens = newMaxTokens.toIntOrNull() ?: 16
-    }
+// MainViewModel.kt
 
     fun send() {
         val text = message.trim()
         if (text.isEmpty()) return
         message = ""
 
-        // ユーザーメッセージを一時的に追加（LLMの返答は空）
         messages = messages + Pair(text, "")
-
         val currentIndex = messages.lastIndex
 
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
             try {
                 llm.send(text, maxTokens)
+                    .onCompletion { cause ->
+                        if (cause == null) {
+                            // 正常に完了した場合、"[Output Completed]"を追加
+                            responseBuilder.append("[Output Completed]")
+                            messages = messages.toMutableList().apply {
+                                this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                            }
+                        }
+                    }
                     .catch { e ->
-                        Log.e(tag, "send() failed", e)
-                        // エラーメッセージをLLMの返答として設定
-                        messages = messages.toMutableList().apply {
-                            this[currentIndex] = this[currentIndex].copy(second = e.message ?: "Error")
+                        when (e) {
+                            is Llm.MaxTokensReachedException -> {
+                                // MaxTokensに達した場合の処理
+                                responseBuilder.append("[Max Tokens Limit Reached]")
+                                messages = messages.toMutableList().apply {
+                                    this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                                }
+                            }
+                            else -> {
+                                Log.e(tag, "send() failed", e)
+                                messages = messages.toMutableList().apply {
+                                    this[currentIndex] = this[currentIndex].copy(second = "Error: ${e.message ?: "Unknown error"}")
+                                }
+                            }
                         }
                     }
                     .collect { token ->
                         responseBuilder.append(token)
-                        // LLMの返答を更新
                         messages = messages.toMutableList().apply {
                             this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                         }
@@ -120,6 +139,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             }
         }
     }
+
 
     fun load(pathToModel: String) {
         if (isLoading) {
