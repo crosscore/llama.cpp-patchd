@@ -32,6 +32,15 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     var currentModelPath: String? by mutableStateOf(null)
         private set
 
+    var seed by mutableIntStateOf(42)
+        private set
+
+    var contextSize by mutableIntStateOf(512)
+        private set
+
+    var numThreads by mutableIntStateOf(4)
+        private set
+
     private var isLoading by mutableStateOf(false)
 
     private var sendJob: Job? = null
@@ -46,6 +55,19 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 messages += exc.message!!
             }
         }
+    }
+
+    // 値を更新する関数
+    fun updateSeed(newSeed: String) {
+        seed = newSeed.toIntOrNull() ?: 42
+    }
+
+    fun updateContextSize(newContextSize: String) {
+        contextSize = newContextSize.toIntOrNull() ?: 512
+    }
+
+    fun updateNumThreads(newNumThreads: String) {
+        numThreads = newNumThreads.toIntOrNull() ?: 4
     }
 
     var maxTokens by mutableIntStateOf(16)
@@ -97,7 +119,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         viewModelScope.launch {
             try {
                 sendJob?.cancel()
-                llm.load(pathToModel)
+                llm.load(pathToModel, seed, contextSize, numThreads)
                 currentModelPath = pathToModel
                 messages += "Loaded $pathToModel"
             } catch (exc: IllegalStateException) {

@@ -101,7 +101,7 @@ Java_com_example_llama_Llm_free_1model(JNIEnv * /*unused*/, jobject /*unused*/, 
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel) {
+Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel, jint seed, jint n_ctx, jint n_threads) {
     auto *model = reinterpret_cast<llama_model *>(jmodel); // NOLINT(*-no-int-to-ptr)
 
     if (!model) {
@@ -110,21 +110,20 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong j
         return 0;
     }
 
-    int n_threads = std::max(1, std::min(8, (int) sysconf(_SC_NPROCESSORS_ONLN) - 2));
     LOGi("Using %d threads", n_threads);
 
     llama_context_params ctx_params = llama_context_default_params();
-    ctx_params.seed  = 1234;
-    ctx_params.n_ctx = 2048;
+    ctx_params.seed  = seed;
+    ctx_params.n_ctx = n_ctx;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
 
     llama_context *context = llama_new_context_with_model(model, ctx_params);
 
     if (!context) {
-        LOGe("llama_new_context_with_model() returned null)");
+        LOGe("llama_new_context_with_model() returned null");
         env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),
-                      "llama_new_context_with_model() returned null)");
+                      "llama_new_context_with_model() returned null");
         return 0;
     }
 

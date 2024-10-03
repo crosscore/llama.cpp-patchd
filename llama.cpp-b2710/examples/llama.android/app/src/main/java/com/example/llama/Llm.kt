@@ -43,7 +43,6 @@ class Llm {
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
     private external fun free_model(model: Long)
-    private external fun new_context(model: Long): Long
     private external fun free_context(context: Long)
     private external fun backend_init()
     private external fun backend_free()
@@ -68,15 +67,18 @@ class Llm {
 
     private external fun kv_cache_clear(context: Long)
 
-    suspend fun load(pathToModel: String) {
+    // external関数の定義を修正
+    private external fun new_context(model: Long, seed: Int, n_ctx: Int, n_threads: Int): Long
+
+
+    // load関数を修正
+    suspend fun load(pathToModel: String, seed: Int, n_ctx: Int, n_threads: Int) {
         withContext(runLoop) {
-            // 現在のモデルをアンロード
             unloadInternal()
-            // 新しいモデルをロード
             val model = load_model(pathToModel)
             if (model == 0L)  throw IllegalStateException("load_model() failed")
 
-            val context = new_context(model)
+            val context = new_context(model, seed, n_ctx, n_threads)
             if (context == 0L) throw IllegalStateException("new_context() failed")
 
             Log.i(tag, "Loaded model $pathToModel")

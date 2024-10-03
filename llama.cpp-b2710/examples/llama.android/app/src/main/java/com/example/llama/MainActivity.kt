@@ -162,6 +162,33 @@ fun MainCompose(
                 .padding(vertical = 8.dp)
         )
 
+        OutlinedTextField(
+            value = viewModel.seed.toString(),
+            onValueChange = { viewModel.updateSeed(it) },
+            label = { Text("Seed") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
+        OutlinedTextField(
+            value = viewModel.numThreads.toString(),
+            onValueChange = { viewModel.updateNumThreads(it) },
+            label = { Text("Threads") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
+        OutlinedTextField(
+            value = viewModel.contextSize.toString(),
+            onValueChange = { viewModel.updateContextSize(it) },
+            label = { Text("Context Size") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+        )
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
