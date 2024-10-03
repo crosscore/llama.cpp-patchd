@@ -229,7 +229,7 @@ Java_com_example_llama_Llm_completion_1init(
     auto n_ctx = llama_n_ctx(context);
     auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
 
-    LOGi("n_len = %d, n_ctx = %d, n_kv_req = %d", n_len, n_ctx, n_kv_req);
+    LOGi("n_len = %d, n_ctx = %d, n_kv_req = %zu", n_len, n_ctx, n_kv_req);
 
     if (n_kv_req > n_ctx) {
         LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");

@@ -1,4 +1,4 @@
-//　llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainActivity.kt
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainActivity.kt
 package com.example.llama
 
 import android.app.ActivityManager
@@ -13,13 +13,17 @@ import android.text.format.Formatter
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.getSystemService
@@ -109,37 +113,65 @@ fun MainCompose(
 ) {
     val context = LocalContext.current
 
-    Column(modifier = Modifier.padding(16.dp)) {
-        // メモリ情報の表示
-        if (viewModel.showMemoryInfo) {
-            val activityManager = context.getSystemService<ActivityManager>()
-            val memoryInfo = ActivityManager.MemoryInfo()
-            activityManager?.getMemoryInfo(memoryInfo)
-            val free = Formatter.formatFileSize(context, memoryInfo.availMem)
-            val total = Formatter.formatFileSize(context, memoryInfo.totalMem)
-            Text("Memory: $free / $total", modifier = Modifier.padding(bottom = 8.dp))
-        }
+    val scrollState = rememberScrollState()
 
-        // モデルパスの表示
-        if (viewModel.showModelPath) {
-            viewModel.currentModelPath?.let {
-                Text("Model Path: $it", modifier = Modifier.padding(bottom = 8.dp))
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+    ) {
+        // メモリ情報とモデルパスの表示をまとめて枠線付きで表示
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(1.dp, Color.Gray)
+                .padding(8.dp)
+        ) {
+            Column {
+                if (viewModel.showMemoryInfo) {
+                    val activityManager = context.getSystemService<ActivityManager>()
+                    val memoryInfo = ActivityManager.MemoryInfo()
+                    activityManager?.getMemoryInfo(memoryInfo)
+                    val free = Formatter.formatFileSize(context, memoryInfo.availMem)
+                    val total = Formatter.formatFileSize(context, memoryInfo.totalMem)
+                    Text("Memory: $free / $total")
+                }
+                if (viewModel.showModelPath && viewModel.currentModelPath != null) {
+                    Text("Model Path: ${viewModel.currentModelPath}")
+                }
             }
         }
 
-        val scrollState = rememberLazyListState()
+        val messageListState = rememberLazyListState()
 
-        Box(modifier = Modifier.weight(1f)) {
+        // メッセージ表示エリアに枠を追加
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .border(1.dp, Color.Gray)
+                .padding(8.dp)
+        ) {
             LazyColumn(
-                state = scrollState,
+                state = messageListState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(viewModel.messages) { message ->
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    )
+                itemsIndexed(viewModel.messages) { index, messagePair ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .border(1.dp, Color.LightGray)
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "User: ${messagePair.first}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Text(
+                            text = "LLM: ${messagePair.second}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
             }
         }
@@ -153,41 +185,42 @@ fun MainCompose(
                 .padding(vertical = 8.dp)
         )
 
-        OutlinedTextField(
-            value = viewModel.maxTokens.toString(),
-            onValueChange = { viewModel.updateMaxTokens(it) },
-            label = { Text("MaxTokens") },
+        // 入力欄を横一列に並べる
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        OutlinedTextField(
-            value = viewModel.seed.toString(),
-            onValueChange = { viewModel.updateSeed(it) },
-            label = { Text("Seed") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        OutlinedTextField(
-            value = viewModel.numThreads.toString(),
-            onValueChange = { viewModel.updateNumThreads(it) },
-            label = { Text("Threads") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
-
-        OutlinedTextField(
-            value = viewModel.contextSize.toString(),
-            onValueChange = { viewModel.updateContextSize(it) },
-            label = { Text("Context Size") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(
+                value = viewModel.maxTokens.toString(),
+                onValueChange = { viewModel.updateMaxTokens(it) },
+                label = { Text("Max\nTokens") },
+                modifier = Modifier
+                    .weight(1f)
+            )
+            OutlinedTextField(
+                value = viewModel.seed.toString(),
+                onValueChange = { viewModel.updateSeed(it) },
+                label = { Text("Seed") },
+                modifier = Modifier
+                    .weight(1f)
+            )
+            OutlinedTextField(
+                value = viewModel.numThreads.toString(),
+                onValueChange = { viewModel.updateNumThreads(it) },
+                label = { Text("Threads") },
+                modifier = Modifier
+                    .weight(1f)
+            )
+            OutlinedTextField(
+                value = viewModel.contextSize.toString(),
+                onValueChange = { viewModel.updateContextSize(it) },
+                label = { Text("Context\nSize") },
+                modifier = Modifier
+                    .weight(1f)
+            )
+        }
 
         Row(
             modifier = Modifier
@@ -198,7 +231,7 @@ fun MainCompose(
             Button(onClick = { viewModel.send() }) { Text("Send") }
             Button(onClick = { viewModel.clear() }) { Text("Clear") }
             Button(onClick = {
-                viewModel.messages.joinToString("\n").let {
+                viewModel.getAllMessages().let {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", it))
                 }
             }) { Text("Copy") }

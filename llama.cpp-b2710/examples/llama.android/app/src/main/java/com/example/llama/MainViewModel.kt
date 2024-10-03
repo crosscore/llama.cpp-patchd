@@ -17,7 +17,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
 
     private val tag: String? = this::class.simpleName
 
-    var messages by mutableStateOf(listOf("Initializing..."))
+    // ユーザーとLLMのメッセージのペアを保持
+    var messages by mutableStateOf(listOf<Pair<String, String>>())
         private set
 
     var message by mutableStateOf("")
@@ -52,7 +53,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             try {
                 llm.unload()
             } catch (exc: IllegalStateException) {
-                messages += exc.message!!
+                // エラーメッセージをログに追加
+                log(exc.message ?: "Unknown error")
             }
         }
     }
@@ -82,8 +84,10 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         if (text.isEmpty()) return
         message = ""
 
-        messages += "User: $text"
-        messages += "LLM: "
+        // ユーザーメッセージを一時的に追加（LLMの返答は空）
+        messages = messages + Pair(text, "")
+
+        val currentIndex = messages.lastIndex
 
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
@@ -91,27 +95,35 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 llm.send(text, maxTokens)
                     .catch { e ->
                         Log.e(tag, "send() failed", e)
-                        messages = messages.dropLast(1) + ("LLM: " + e.message!!)
+                        // エラーメッセージをLLMの返答として設定
+                        messages = messages.toMutableList().apply {
+                            this[currentIndex] = this[currentIndex].copy(second = e.message ?: "Error")
+                        }
                     }
                     .collect { token ->
                         responseBuilder.append(token)
-                        messages = messages.dropLast(1) + ("LLM: $responseBuilder")
+                        // LLMの返答を更新
+                        messages = messages.toMutableList().apply {
+                            this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                        }
                     }
-                // 2. LLMの最終トークン出力後に完了を示す文字列を追加
-                messages += "[Output Completed]"
             } catch (e: CancellationException) {
                 Log.i(tag, "send() canceled")
-                messages += "Operation canceled."
+                messages = messages.toMutableList().apply {
+                    this[currentIndex] = this[currentIndex].copy(second = "Operation canceled.")
+                }
             } catch (e: Exception) {
                 Log.e(tag, "send() failed", e)
-                messages += "Error: ${e.message ?: "Unknown error"}"
+                messages = messages.toMutableList().apply {
+                    this[currentIndex] = this[currentIndex].copy(second = "Error: ${e.message ?: "Unknown error"}")
+                }
             }
         }
     }
 
     fun load(pathToModel: String) {
         if (isLoading) {
-            messages += "Model is already loading. Please wait."
+            log("Model is already loading. Please wait.")
             return
         }
 
@@ -121,10 +133,10 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 sendJob?.cancel()
                 llm.load(pathToModel, seed, contextSize, numThreads)
                 currentModelPath = pathToModel
-                messages += "Loaded $pathToModel"
+                log("Loaded $pathToModel")
             } catch (exc: IllegalStateException) {
                 Log.e(tag, "load() failed", exc)
-                messages += exc.message!!
+                log(exc.message ?: "Unknown error")
             } finally {
                 isLoading = false
             }
@@ -140,7 +152,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     }
 
     fun log(message: String) {
-        messages += message
+        // システムメッセージとしてログを追加
+        messages = messages + Pair("[System]", message)
     }
 
     fun toggleMemoryInfo() {
@@ -149,5 +162,12 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
 
     fun toggleModelPath() {
         showModelPath = !showModelPath
+    }
+
+    // 全てのメッセージを文字列として取得
+    fun getAllMessages(): String {
+        return messages.joinToString("\n") { (user, llm) ->
+            "User: $user\nLLM: $llm"
+        }
     }
 }
