@@ -65,7 +65,6 @@ class MainActivity(
 
         val extFilesDir = getExternalFilesDir(null)
 
-        // ダウンロード済みモデルを検出
         val downloadedModels = extFilesDir?.listFiles { file ->
             file.isFile && file.extension == "gguf"
         }?.map { file ->
@@ -84,7 +83,7 @@ class MainActivity(
                 File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf"),
                 sha256 = "e7effd3e3a3b6f1c05b914deca7c9646210bad34576d39d3c5c5f2a25cb97ae1"
             ),
-        ) + downloadedModels // ダウンロード済みモデルを追加
+        ) + downloadedModels
 
         setContent {
             LlamaAndroidTheme {
@@ -162,7 +161,6 @@ fun MainCompose(
                             .padding(8.dp)
                     ) {
                         if (messagePair.first == "[System]") {
-                            // システムメッセージの場合
                             Text(
                                 text = messagePair.second,
                                 style = MaterialTheme.typography.bodyLarge
