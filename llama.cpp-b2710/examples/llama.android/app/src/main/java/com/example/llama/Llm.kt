@@ -67,11 +67,8 @@ class Llm {
 
     private external fun kv_cache_clear(context: Long)
 
-    // external関数の定義を修正
     private external fun new_context(model: Long, seed: Int, n_ctx: Int, n_threads: Int): Long
 
-
-    // load関数を修正
     suspend fun load(pathToModel: String, seed: Int, n_ctx: Int, n_threads: Int) {
         withContext(runLoop) {
             unloadInternal()
@@ -86,33 +83,39 @@ class Llm {
         }
     }
 
-    // MaxTokensに達したことを示す例外を定義
     class MaxTokensReachedException : Exception("Max tokens limit reached")
 
-    suspend fun send(message: String, nLen: Int): Flow<String> = flow {
+    suspend fun send(message: String, nLen: Int, seed: Int, n_ctx: Int, n_threads: Int): Flow<String> = flow {
         val state = threadLocalState.get()
         when (state) {
             is State.Loaded -> {
-                val batch = new_batch(512, 0, 1)
-                if (batch == 0L) throw IllegalStateException("new_batch() failed")
+                // 新しいコンテキストを作成
+                val context = new_context(state.model, seed, n_ctx, n_threads)
+                if (context == 0L) throw IllegalStateException("new_context() failed")
 
-                val ncur = IntVar(completion_init(state.context, batch, message, nLen))
-                while (true) {
-                    currentCoroutineContext().ensureActive()
+                try {
+                    val batch = new_batch(512, 0, 1)
+                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
-                    val str = completion_loop(state.context, batch, nLen, ncur)
-                    if (str == null || str == "\n" || str.isEmpty() || str == "<EOS_TOKEN_DETECTED>") {
-                        // EOSトークンにより終了
-                        break
-                    } else if (str == "<MAX_TOKENS_REACHED>") {
-                        // MaxTokensに達した場合、例外を投げる
-                        throw MaxTokensReachedException()
-                    } else {
-                        emit(str)
+                    val ncur = IntVar(completion_init(context, batch, message, nLen))
+                    while (true) {
+                        currentCoroutineContext().ensureActive()
+
+                        val str = completion_loop(context, batch, nLen, ncur)
+                        if (str.isNullOrEmpty() || str == "<EOS_TOKEN_DETECTED>") {
+                            break
+                        } else if (str == "<MAX_TOKENS_REACHED>") {
+                            throw MaxTokensReachedException()
+                        } else {
+                            emit(str)
+                        }
                     }
+                    kv_cache_clear(context)
+                    free_batch(batch)
+                } finally {
+                    // コンテキストを解放
+                    free_context(context)
                 }
-                kv_cache_clear(state.context)
-                free_batch(batch)
             }
             else -> {}
         }
@@ -155,7 +158,7 @@ class Llm {
             data class Loaded(val model: Long, val context: Long): State
         }
 
-        // Llmのインスタンスは1つだけにします。
+        // Llmのインスタンスは1つだけ
         private val _instance: Llm = Llm()
         fun instance(): Llm = _instance
     }

@@ -80,8 +80,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         numThreads = newNumThreads.toIntOrNull() ?: 4
     }
 
-// MainViewModel.kt
-
     fun send() {
         val text = message.trim()
         if (text.isEmpty()) return
@@ -93,10 +91,9 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
             try {
-                llm.send(text, maxTokens)
+                llm.send(text, maxTokens, seed, contextSize, numThreads)
                     .onCompletion { cause ->
                         if (cause == null) {
-                            // 正常に完了した場合、"[Output Completed]"を追加
                             responseBuilder.append("[Output Completed]")
                             messages = messages.toMutableList().apply {
                                 this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
@@ -106,7 +103,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                     .catch { e ->
                         when (e) {
                             is Llm.MaxTokensReachedException -> {
-                                // MaxTokensに達した場合の処理
                                 responseBuilder.append("[Max Tokens Limit Reached]")
                                 messages = messages.toMutableList().apply {
                                     this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
@@ -139,7 +135,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             }
         }
     }
-
 
     fun load(pathToModel: String) {
         if (isLoading) {

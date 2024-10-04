@@ -73,7 +73,7 @@ class MainActivity(
                 file.name,
                 Uri.EMPTY,
                 file,
-                sha256 = "" // ダウンロード済みモデルのSHA256は空文字列
+                sha256 = ""
             )
         } ?: emptyList()
 
@@ -144,7 +144,6 @@ fun MainCompose(
 
         val messageListState = rememberLazyListState()
 
-        // メッセージ表示エリアに枠を追加
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -160,17 +159,24 @@ fun MainCompose(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
-                            .border(1.dp, Color.LightGray)
                             .padding(8.dp)
                     ) {
-                        Text(
-                            text = "User: ${messagePair.first}",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            text = "LLM: ${messagePair.second}",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
+                        if (messagePair.first == "[System]") {
+                            // システムメッセージの場合
+                            Text(
+                                text = messagePair.second,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        } else {
+                            Text(
+                                text = "User: ${messagePair.first}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "LLM: ${messagePair.second}",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
                     }
                 }
             }
@@ -185,7 +191,6 @@ fun MainCompose(
                 .padding(vertical = 8.dp)
         )
 
-        // 入力欄を横一列に並べる
         Row(
             modifier = Modifier
                 .fillMaxWidth()

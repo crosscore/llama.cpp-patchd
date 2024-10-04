@@ -295,15 +295,13 @@ Java_com_example_llama_Llm_completion_1loop(
 
     // EOSトークンの検出
     if (llama_token_is_eog(model, new_token_id)) {
-        // EOSトークンが出力された場合、空文字列を返す
-        LOGi("Detected EOS TOKEN");
+        LOGi("Detected EOS TOKEN ID: %d", new_token_id);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
     // MaxTokensに達した場合の処理
     if (n_cur >= n_len) {
-        // 特別な文字列を返す
-        LOGi("MAX_TOKENS_REACHED");
+        LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d)", n_cur, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
