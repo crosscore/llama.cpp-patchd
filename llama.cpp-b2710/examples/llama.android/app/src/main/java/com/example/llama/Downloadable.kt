@@ -19,7 +19,7 @@ import java.security.MessageDigest
 data class Downloadable(
     val name: String,
     val source: Uri,
-    val destination: File,
+    val file: File,
     val sha256: String
 ) {
     companion object {
@@ -40,11 +40,11 @@ data class Downloadable(
         ) {
             var status by remember {
                 mutableStateOf(
-                    if (item.destination.exists() && (item.sha256.isEmpty() || verifyFileSha256(item.destination, item.sha256))) {
+                    if (item.file.exists() && (item.sha256.isEmpty() || verifyFileSha256(item.file, item.sha256))) {
                         Downloaded(item)
                     } else {
-                        if (item.destination.exists()) {
-                            item.destination.delete()
+                        if (item.file.exists()) {
+                            item.file.delete()
                         }
                         Ready
                     }
@@ -66,10 +66,10 @@ data class Downloadable(
                             val statusCode = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
                             when (statusCode) {
                                 DownloadManager.STATUS_SUCCESSFUL -> {
-                                    if (item.sha256.isEmpty() || verifyFileSha256(item.destination, item.sha256)) {
+                                    if (item.sha256.isEmpty() || verifyFileSha256(item.file, item.sha256)) {
                                         return Downloaded(item)
                                     } else {
-                                        item.destination.delete()
+                                        item.file.delete()
                                         return Error("SHA256 checksum mismatch")
                                     }
                                 }
@@ -91,7 +91,7 @@ data class Downloadable(
             }
 
             fun initiateDownload() {
-                item.destination.delete()
+                item.file.delete()
 
                 val request = DownloadManager.Request(item.source).apply {
                     setTitle("Downloading model")
@@ -99,12 +99,12 @@ data class Downloadable(
                     setAllowedNetworkTypes(
                         DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE
                     )
-                    setDestinationUri(Uri.fromFile(item.destination))
+                    setDestinationUri(Uri.fromFile(item.file))
                     setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 }
 
-                viewModel.log("Saving ${item.name} to ${item.destination.path}")
-                Log.i(tag, "Saving ${item.name} to ${item.destination.path}")
+                viewModel.log("Saving ${item.name} to ${item.file.path}")
+                Log.i(tag, "Saving ${item.name} to ${item.file.path}")
 
                 val downloadId = dm.enqueue(request)
                 status = Downloading(0, downloadId)
@@ -129,7 +129,7 @@ data class Downloadable(
             fun onClick() {
                 when (status) {
                     is Downloaded -> {
-                        viewModel.load(item.destination.path)
+                        viewModel.load(item.file.path)
                     }
                     is Ready, is Error -> {
                         initiateDownload()

@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
@@ -72,22 +75,52 @@ class Llm {
     suspend fun load(pathToModel: String, seed: Int, n_ctx: Int, n_threads: Int) {
         withContext(runLoop) {
             unloadInternal()
-            val model = load_model(pathToModel)
-            if (model == 0L)  throw IllegalStateException("load_model() failed")
+            val actualPath: String
+            val tempFile: File?
+
+            if (pathToModel.endsWith(".enc")) {
+                // 暗号化されたモデルの場合、一時ファイルに復号化
+                tempFile = File.createTempFile("model", ".gguf")
+                try {
+                    ModelCrypto().decryptModel(
+                        inputStream = FileInputStream(pathToModel),
+                        outputStream = FileOutputStream(tempFile)
+                    )
+                    actualPath = tempFile.absolutePath
+                } catch (e: Exception) {
+                    tempFile.delete()
+                    throw IllegalStateException("Failed to decrypt model: ${e.message}")
+                }
+            } else {
+                actualPath = pathToModel
+                tempFile = null
+            }
+
+            val model = load_model(actualPath)
+            if (model == 0L) {
+                tempFile?.delete()
+                throw IllegalStateException("load_model() failed")
+            }
 
             val context = new_context(model, seed, n_ctx, n_threads)
-            if (context == 0L) throw IllegalStateException("new_context() failed")
+            if (context == 0L) {
+                free_model(model)
+                tempFile?.delete()
+                throw IllegalStateException("new_context() failed")
+            }
 
-            Log.i(tag, "Loaded model $pathToModel")
+            Log.i(tag, "Loaded model $actualPath")
             threadLocalState.set(State.Loaded(model, context))
+
+            // 使用後に一時ファイルを削除
+            tempFile?.deleteOnExit()
         }
     }
 
     class MaxTokensReachedException : Exception("Max tokens limit reached")
 
     suspend fun send(message: String, nLen: Int, seed: Int, n_ctx: Int, n_threads: Int): Flow<String> = flow {
-        val state = threadLocalState.get()
-        when (state) {
+        when (val state = threadLocalState.get()) {
             is State.Loaded -> {
                 // 新しいコンテキストを作成
                 val context = new_context(state.model, seed, n_ctx, n_threads)

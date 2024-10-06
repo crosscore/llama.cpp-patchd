@@ -13,6 +13,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
 
@@ -183,6 +186,23 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     fun getAllMessages(): String {
         return messages.joinToString("\n") { (user, llm) ->
             "User: $user\nLLM: $llm"
+        }
+    }
+
+    fun encryptModel(model: Downloadable) {
+        viewModelScope.launch {
+            try {
+                val inputFile: File = model.file
+                val encryptedFile = File(inputFile.parent, "${inputFile.name}.enc")
+
+                ModelCrypto().encryptModel(
+                    inputStream = FileInputStream(inputFile),
+                    outputStream = FileOutputStream(encryptedFile)
+                )
+                log("Model encrypted: ${encryptedFile.absolutePath}")
+            } catch (e: Exception) {
+                log("Encryption failed: ${e.message}")
+            }
         }
     }
 }

@@ -1,4 +1,7 @@
-// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/ModelCrypt.kt
+
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/ModelCrypto.kt
+package com.example.llama
+
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.io.InputStream

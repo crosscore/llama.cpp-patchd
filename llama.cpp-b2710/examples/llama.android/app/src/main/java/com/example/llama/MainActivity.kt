@@ -22,10 +22,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.getSystemService
 import com.example.llama.ui.theme.LlamaAndroidTheme
 import java.io.File
@@ -86,6 +90,8 @@ class MainActivity(
         ) + downloadedModels
 
         setContent {
+            var showEncryptionDialog by remember { mutableStateOf(false) }
+
             LlamaAndroidTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -96,6 +102,8 @@ class MainActivity(
                         clipboardManager,
                         downloadManager,
                         models,
+                        showEncryptionDialog,
+                        onShowEncryptionDialog = { showEncryptionDialog = it }
                     )
                 }
             }
@@ -108,7 +116,9 @@ fun MainCompose(
     viewModel: MainViewModel,
     clipboard: ClipboardManager,
     dm: DownloadManager,
-    models: List<Downloadable>
+    models: List<Downloadable>,
+    showEncryptionDialog: Boolean,
+    onShowEncryptionDialog: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -153,7 +163,7 @@ fun MainCompose(
                 state = messageListState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                itemsIndexed(viewModel.messages) { index, messagePair ->
+                itemsIndexed(viewModel.messages) { _, messagePair ->
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -248,6 +258,18 @@ fun MainCompose(
         ) {
             Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
             Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
+            Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
+        }
+
+        if (showEncryptionDialog) {
+            EncryptionDialog(
+                onDismiss = { onShowEncryptionDialog(false) },
+                models = models,
+                onEncrypt = { model ->
+                    viewModel.encryptModel(model)
+                    onShowEncryptionDialog(false)
+                }
+            )
         }
 
         Column(modifier = Modifier.padding(top = 8.dp)) {
