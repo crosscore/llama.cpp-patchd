@@ -53,6 +53,10 @@ data class Downloadable(
 
             val coroutineScope = rememberCoroutineScope()
 
+            // 追加: ViewModelのロード状態を取得
+            val isLoading = viewModel.isLoading
+            val loadingModelName = viewModel.loadingModelName
+
             suspend fun monitorDownload(downloadId: Long): State {
                 while (true) {
                     val query = DownloadManager.Query().setFilterById(downloadId)
@@ -142,15 +146,39 @@ data class Downloadable(
 
             Button(
                 onClick = { onClick() },
-                enabled = status !is Downloading
+                enabled = (status !is Downloading) && (loadingModelName == null || loadingModelName == item.name)
             ) {
-                when (val currentStatus = status) {
-                    is Downloading -> {
-                        Text("Downloading ${currentStatus.progress}%")
+                when {
+                    // 追加: ロード中の場合の表示
+                    isLoading && loadingModelName == item.name -> {
+                        Text("Loading...")
                     }
-                    is Downloaded -> Text("Load ${item.name}")
-                    is Ready -> Text(if (item.source == Uri.EMPTY) "Load ${item.name}" else "Download ${item.name}")
-                    is Error -> Text("Retry ${item.name}")
+                    isLoading && loadingModelName != item.name -> {
+                        // 他のモデルがロード中の場合は通常の状態を維持
+                        when (val currentStatus = status) {
+                            is Downloading -> {
+                                Text("Downloading ${currentStatus.progress}%")
+                            }
+                            is Downloaded -> Text("Load ${item.name}")
+                            is Ready -> Text(if (item.source == Uri.EMPTY) "Load ${item.name}" else "Download ${item.name}")
+                            is Error -> Text("Retry ${item.name}")
+                        }
+                    }
+                    status is Downloading -> {
+                        Text("Downloading ${ (status as Downloading).progress }%")
+                    }
+                    status is Downloaded -> {
+                        Text("Load ${item.name}")
+                    }
+                    status is Ready -> {
+                        Text(if (item.source == Uri.EMPTY) "Load ${item.name}" else "Download ${item.name}")
+                    }
+                    status is Error -> {
+                        Text("Retry ${item.name}")
+                    }
+                    else -> {
+                        Text("Load ${item.name}")
+                    }
                 }
             }
 

@@ -49,7 +49,12 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     var numThreads by mutableIntStateOf(4)
         private set
 
-    private var isLoading by mutableStateOf(false)
+    // 追加: モデルのロード状態を公開
+    var isLoading by mutableStateOf(false)
+        private set
+
+    var loadingModelName by mutableStateOf<String?>(null)
+        private set
 
     private var sendJob: Job? = null
 
@@ -139,6 +144,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
+    // 変更: load関数でisLoadingとloadingModelNameを管理
     fun load(pathToModel: String) {
         if (isLoading) {
             log("Model is already loading. Please wait.")
@@ -146,6 +152,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
 
         isLoading = true
+        loadingModelName = File(pathToModel).name
+
         viewModelScope.launch {
             try {
                 sendJob?.cancel()
@@ -157,6 +165,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 log(exc.message ?: "Unknown error")
             } finally {
                 isLoading = false
+                loadingModelName = null
             }
         }
     }
