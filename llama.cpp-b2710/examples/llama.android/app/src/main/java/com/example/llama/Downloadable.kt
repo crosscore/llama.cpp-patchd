@@ -53,7 +53,7 @@ data class Downloadable(
 
             val coroutineScope = rememberCoroutineScope()
 
-            // 追加: ViewModelのロード状態を取得
+            // ViewModelのロード状態を取得
             val isLoading = viewModel.isLoading
             val loadingModelName = viewModel.loadingModelName
 
@@ -149,7 +149,7 @@ data class Downloadable(
                 enabled = (status !is Downloading) && (loadingModelName == null || loadingModelName == item.name)
             ) {
                 when {
-                    // 追加: ロード中の場合の表示
+                    // ロード中の場合の表示
                     isLoading && loadingModelName == item.name -> {
                         Text("Loading...")
                     }
