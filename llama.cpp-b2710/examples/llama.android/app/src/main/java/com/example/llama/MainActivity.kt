@@ -23,26 +23,22 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.core.content.getSystemService
 import com.example.llama.ui.theme.LlamaAndroidTheme
 import java.io.File
 
-class MainActivity(
-    activityManager: ActivityManager? = null,
-    downloadManager: DownloadManager? = null,
-    clipboardManager: ClipboardManager? = null,
-) : ComponentActivity() {
+class MainActivity : ComponentActivity() {
 
-    private val activityManager by lazy { activityManager ?: getSystemService<ActivityManager>()!! }
-    private val downloadManager by lazy { downloadManager ?: getSystemService<DownloadManager>()!! }
-    private val clipboardManager by lazy { clipboardManager ?: getSystemService<ClipboardManager>()!! }
+    private val activityManager by lazy { getSystemService<ActivityManager>()!! }
+    private val downloadManager by lazy { getSystemService<DownloadManager>()!! }
+    private val clipboardManager by lazy { getSystemService<ClipboardManager>()!! }
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -91,6 +87,7 @@ class MainActivity(
 
         setContent {
             var showEncryptionDialog by remember { mutableStateOf(false) }
+            var showModelDialog by remember { mutableStateOf(false) }
 
             LlamaAndroidTheme {
                 Surface(
@@ -103,7 +100,9 @@ class MainActivity(
                         downloadManager,
                         models,
                         showEncryptionDialog,
-                        onShowEncryptionDialog = { showEncryptionDialog = it }
+                        onShowEncryptionDialog = { showEncryptionDialog = it },
+                        showModelDialog,
+                        onShowModelDialog = { showModelDialog = it }
                     )
                 }
             }
@@ -118,7 +117,9 @@ fun MainCompose(
     dm: DownloadManager,
     models: List<Downloadable>,
     showEncryptionDialog: Boolean,
-    onShowEncryptionDialog: (Boolean) -> Unit
+    onShowEncryptionDialog: (Boolean) -> Unit,
+    showModelDialog: Boolean,
+    onShowModelDialog: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -250,17 +251,28 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        // ボタンを2つの行に分割
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
-            Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
-            Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
+                Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
+                Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
+            }
         }
 
+        // ダイアログの表示
         if (showEncryptionDialog) {
             EncryptionDialog(
                 onDismiss = { onShowEncryptionDialog(false) },
@@ -272,10 +284,13 @@ fun MainCompose(
             )
         }
 
-        Column(modifier = Modifier.padding(top = 8.dp)) {
-            for (model in models) {
-                Downloadable.Button(viewModel, dm, model)
-            }
+        if (showModelDialog) {
+            ModelDialog(
+                onDismiss = { onShowModelDialog(false) },
+                models = models,
+                viewModel = viewModel,
+                dm = dm
+            )
         }
     }
 }
