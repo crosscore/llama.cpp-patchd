@@ -11,6 +11,8 @@ import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 class ModelCrypto {
     companion object {
@@ -79,6 +81,42 @@ class ModelCrypto {
                     output.write(finalBytes)
                 }
                 onProgress(1f) // 暗号化完了を通知
+            }
+        }
+    }
+
+    fun encryptModelFlow(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        totalSize: Long
+    ): Flow<Float> = flow {
+        val cipher = Cipher.getInstance(TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
+
+        val iv = cipher.iv
+        outputStream.write(iv)
+
+        inputStream.use { input ->
+            outputStream.use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                var bytesProcessed = 0L
+
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    val encryptedBytes = cipher.update(buffer, 0, bytesRead)
+                    if (encryptedBytes != null) {
+                        output.write(encryptedBytes)
+                    }
+                    bytesProcessed += bytesRead
+                    val progress = bytesProcessed.toFloat() / totalSize
+                    emit(progress) // 進捗をFlowで送信
+                }
+
+                val finalBytes = cipher.doFinal()
+                if (finalBytes != null) {
+                    output.write(finalBytes)
+                }
+                emit(1f) // 暗号化完了を通知
             }
         }
     }

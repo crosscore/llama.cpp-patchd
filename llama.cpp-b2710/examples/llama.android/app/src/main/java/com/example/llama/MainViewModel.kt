@@ -10,7 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
@@ -147,7 +149,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
-    // 暗号化の進捗を管理
     fun encryptModel(model: Downloadable) {
         viewModelScope.launch {
             try {
@@ -156,14 +157,16 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 val totalSize = inputFile.length()
                 encryptionProgress[model.name] = 0f
 
-                ModelCrypto().encryptModel(
+                ModelCrypto().encryptModelFlow(
                     inputStream = FileInputStream(inputFile),
                     outputStream = FileOutputStream(encryptedFile),
-                    totalSize = totalSize,
-                    onProgress = { progress ->
+                    totalSize = totalSize
+                )
+                    .flowOn(Dispatchers.IO) // 暗号化処理をIOスレッドで実行
+                    .collect { progress ->
+                        // メインスレッドで進捗を更新
                         encryptionProgress[model.name] = progress
                     }
-                )
                 encryptionProgress.remove(model.name)
                 log("Model encrypted: ${encryptedFile.absolutePath}")
             } catch (e: Exception) {
