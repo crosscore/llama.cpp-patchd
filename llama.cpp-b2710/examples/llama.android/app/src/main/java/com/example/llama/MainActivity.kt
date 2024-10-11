@@ -66,7 +66,7 @@ class MainActivity : ComponentActivity() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
-            file.isFile && (file.extension == "gguf" || file.extension == ".enc")
+            file.isFile && (file.extension == "gguf" || file.extension == "enc")
         }?.map { file ->
             Downloadable(
                 file.name,
@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var showEncryptionDialog by remember { mutableStateOf(false) }
-            var showDecryptionDialog by remember { mutableStateOf(false) } // 追加
+            var showDecryptionDialog by remember { mutableStateOf(false) }
             var showModelDialog by remember { mutableStateOf(false) }
 
             LlamaAndroidTheme {
@@ -102,8 +102,8 @@ class MainActivity : ComponentActivity() {
                         models,
                         showEncryptionDialog,
                         onShowEncryptionDialog = { showEncryptionDialog = it },
-                        showDecryptionDialog, // 追加
-                        onShowDecryptionDialog = { showDecryptionDialog = it }, // 追加
+                        showDecryptionDialog,
+                        onShowDecryptionDialog = { showDecryptionDialog = it },
                         showModelDialog,
                         onShowModelDialog = { showModelDialog = it }
                     )
@@ -121,8 +121,8 @@ fun MainCompose(
     models: List<Downloadable>,
     showEncryptionDialog: Boolean,
     onShowEncryptionDialog: (Boolean) -> Unit,
-    showDecryptionDialog: Boolean, // 追加
-    onShowDecryptionDialog: (Boolean) -> Unit, // 追加
+    showDecryptionDialog: Boolean,
+    onShowDecryptionDialog: (Boolean) -> Unit,
     showModelDialog: Boolean,
     onShowModelDialog: (Boolean) -> Unit
 ) {
@@ -273,7 +273,7 @@ fun MainCompose(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
-                Button(onClick = { onShowDecryptionDialog(true) }) { Text("Decryption") } // 追加
+                Button(onClick = { onShowDecryptionDialog(true) }) { Text("Decryption") }
                 Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
             }
         }
@@ -290,7 +290,7 @@ fun MainCompose(
             )
         }
 
-        if (showDecryptionDialog) { // 追加
+        if (showDecryptionDialog) {
             DecryptionDialog(
                 onDismiss = { onShowDecryptionDialog(false) },
                 models = models,
