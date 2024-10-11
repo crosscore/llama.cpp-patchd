@@ -58,6 +58,46 @@ fun EncryptionDialog(
 }
 
 @Composable
+fun DecryptionDialog(
+    onDismiss: () -> Unit,
+    models: List<Downloadable>,
+    onDecrypt: (Downloadable) -> Unit,
+    viewModel: MainViewModel
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select a model to decrypt") },
+        text = {
+            Column {
+                models.filter { it.file.extension == "enc" }.forEach { model ->
+                    val progress = viewModel.decryptionProgress[model.name] ?: 0f
+                    val buttonText = if (progress > 0f && progress < 1f) {
+                        "${model.name} (${(progress * 100).toInt()}%)"
+                    } else {
+                        model.name
+                    }
+                    Button(
+                        onClick = { onDecrypt(model) },
+                        enabled = progress == 0f || progress >= 1f,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(buttonText)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
 fun ModelDialog(
     onDismiss: () -> Unit,
     models: List<Downloadable>,

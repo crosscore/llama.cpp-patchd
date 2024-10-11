@@ -83,15 +83,18 @@ class Llm {
                 try {
                     val totalSize = File(pathToModel).length()
 
-                    ModelCrypto().decryptModel(
+                    // decryptModelFlowを使用して進捗を収集
+                    val decryptionFlow = ModelCrypto().decryptModelFlow(
                         inputStream = FileInputStream(pathToModel),
                         outputStream = FileOutputStream(tempFile),
-                        totalSize = totalSize,
-                        onProgress = { progress ->
-                            // 進捗表示処理
-                            Log.d(tag, "Decryption progress: ${(progress * 100).toInt()}%")
-                        }
+                        totalSize = totalSize
                     )
+
+                    // コルーチン内でFlowを収集
+                    decryptionFlow.collect { progress ->
+                        Log.d(tag, "Decryption progress: ${(progress * 100).toInt()}%")
+                    }
+
                     actualPath = tempFile.absolutePath
                 } catch (e: Exception) {
                     tempFile.delete()

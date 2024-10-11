@@ -52,7 +52,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     var numThreads by mutableIntStateOf(4)
         private set
 
-    // 追加: モデルのロード状態を公開
+    // モデルのロード状態を公開
     var isLoading by mutableStateOf(false)
         private set
 
@@ -60,6 +60,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         private set
 
     val encryptionProgress = mutableStateMapOf<String, Float>()
+    val decryptionProgress = mutableStateMapOf<String, Float>()
 
     private var sendJob: Job? = null
 
@@ -70,13 +71,11 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             try {
                 llm.unload()
             } catch (exc: IllegalStateException) {
-                // エラーメッセージをログに追加
                 log(exc.message ?: "Unknown error")
             }
         }
     }
 
-    // 値を更新する関数
     fun updateMaxTokens(newMaxTokens: String) {
         maxTokens = newMaxTokens.toIntOrNull() ?: 32
     }
@@ -156,8 +155,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 val encryptedFile = File(inputFile.parent, "${inputFile.name}.enc")
                 val totalSize = inputFile.length()
                 encryptionProgress[model.name] = 0f
-
-                // 進捗ログ出力のための変数を追加
                 var lastLoggedPercent = 0
 
                 ModelCrypto().encryptModelFlow(
@@ -185,7 +182,39 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
-    // load関数でisLoadingとloadingModelNameを管理
+    fun decryptModel(model: Downloadable) {
+        viewModelScope.launch {
+            try {
+                val inputFile: File = model.file
+                val decryptedFile = File(inputFile.parent, inputFile.name.removeSuffix(".enc"))
+                val totalSize = inputFile.length()
+                decryptionProgress[model.name] = 0f
+                var lastLoggedPercent = 0
+
+                ModelCrypto().decryptModelFlow(
+                    inputStream = FileInputStream(inputFile),
+                    outputStream = FileOutputStream(decryptedFile),
+                    totalSize = totalSize
+                )
+                    .flowOn(Dispatchers.IO)
+                    .collect { progress ->
+                        decryptionProgress[model.name] = progress
+
+                        val currentPercent = (progress * 100).toInt()
+                        if (currentPercent > lastLoggedPercent) {
+                            lastLoggedPercent = currentPercent
+                            Log.d("DecryptionProgress", "Progress for ${model.name}: ${currentPercent}%")
+                        }
+                    }
+                decryptionProgress.remove(model.name)
+                log("Model decrypted: ${decryptedFile.absolutePath}")
+            } catch (e: Exception) {
+                decryptionProgress.remove(model.name)
+                log("Decryption failed: ${e.message}")
+            }
+        }
+    }
+
     fun load(pathToModel: String) {
         if (isLoading) {
             log("Model is already loading. Please wait.")
@@ -220,7 +249,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     }
 
     fun log(message: String) {
-        // システムメッセージとしてログを追加
         messages = messages + Pair("[System]", message)
     }
 
@@ -232,7 +260,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         showModelPath = !showModelPath
     }
 
-    // 全てのメッセージを文字列として取得
     fun getAllMessages(): String {
         return messages.joinToString("\n") { (user, llm) ->
             "User: $user\nLLM: $llm"
