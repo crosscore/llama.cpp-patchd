@@ -4,6 +4,7 @@ package com.example.llama
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -55,6 +56,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
 
     var loadingModelName by mutableStateOf<String?>(null)
         private set
+
+    val encryptionProgress = mutableStateMapOf<String, Float>()
 
     private var sendJob: Job? = null
 
@@ -144,7 +147,33 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
-    // 変更: load関数でisLoadingとloadingModelNameを管理
+    // 暗号化の進捗を管理
+    fun encryptModel(model: Downloadable) {
+        viewModelScope.launch {
+            try {
+                val inputFile: File = model.file
+                val encryptedFile = File(inputFile.parent, "${inputFile.name}.enc")
+                val totalSize = inputFile.length()
+                encryptionProgress[model.name] = 0f
+
+                ModelCrypto().encryptModel(
+                    inputStream = FileInputStream(inputFile),
+                    outputStream = FileOutputStream(encryptedFile),
+                    totalSize = totalSize,
+                    onProgress = { progress ->
+                        encryptionProgress[model.name] = progress
+                    }
+                )
+                encryptionProgress.remove(model.name)
+                log("Model encrypted: ${encryptedFile.absolutePath}")
+            } catch (e: Exception) {
+                encryptionProgress.remove(model.name)
+                log("Encryption failed: ${e.message}")
+            }
+        }
+    }
+
+    // load関数でisLoadingとloadingModelNameを管理
     fun load(pathToModel: String) {
         if (isLoading) {
             log("Model is already loading. Please wait.")
@@ -195,23 +224,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     fun getAllMessages(): String {
         return messages.joinToString("\n") { (user, llm) ->
             "User: $user\nLLM: $llm"
-        }
-    }
-
-    fun encryptModel(model: Downloadable) {
-        viewModelScope.launch {
-            try {
-                val inputFile: File = model.file
-                val encryptedFile = File(inputFile.parent, "${inputFile.name}.enc")
-
-                ModelCrypto().encryptModel(
-                    inputStream = FileInputStream(inputFile),
-                    outputStream = FileOutputStream(encryptedFile)
-                )
-                log("Model encrypted: ${encryptedFile.absolutePath}")
-            } catch (e: Exception) {
-                log("Encryption failed: ${e.message}")
-            }
         }
     }
 }

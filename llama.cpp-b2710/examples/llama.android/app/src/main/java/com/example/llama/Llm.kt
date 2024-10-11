@@ -1,5 +1,4 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Llm.kt
-@file:Suppress("FunctionName")
 package com.example.llama
 
 import android.util.Log
@@ -82,9 +81,16 @@ class Llm {
                 // 暗号化されたモデルの場合、一時ファイルに復号化
                 tempFile = File.createTempFile("model", ".gguf")
                 try {
+                    val totalSize = File(pathToModel).length()
+
                     ModelCrypto().decryptModel(
                         inputStream = FileInputStream(pathToModel),
-                        outputStream = FileOutputStream(tempFile)
+                        outputStream = FileOutputStream(tempFile),
+                        totalSize = totalSize,
+                        onProgress = { progress ->
+                            // 進捗表示処理
+                            Log.d(tag, "Decryption progress: ${(progress * 100).toInt()}%")
+                        }
                     )
                     actualPath = tempFile.absolutePath
                 } catch (e: Exception) {
@@ -110,10 +116,7 @@ class Llm {
             }
 
             Log.i(tag, "Loaded model $actualPath")
-            threadLocalState.set(State.Loaded(model, context))
-
-            // 使用後に一時ファイルを削除
-            tempFile?.deleteOnExit()
+            threadLocalState.set(State.Loaded(model, context, tempFile))
         }
     }
 
@@ -166,7 +169,7 @@ class Llm {
                 // `batch` は各関数でローカルに解放されるため、ここでの解放は不要
                 free_context(state.context)
                 free_model(state.model)
-
+                state.tempFile?.delete()
                 threadLocalState.set(State.Idle)
             }
             else -> {}
@@ -187,8 +190,8 @@ class Llm {
         }
 
         private sealed interface State {
-            data object Idle: State
-            data class Loaded(val model: Long, val context: Long): State
+            data object Idle : State
+            data class Loaded(val model: Long, val context: Long, val tempFile: File?) : State
         }
 
         // Llmのインスタンスは1つだけ

@@ -279,8 +279,8 @@ fun MainCompose(
                 models = models,
                 onEncrypt = { model ->
                     viewModel.encryptModel(model)
-                    onShowEncryptionDialog(false)
-                }
+                },
+                viewModel = viewModel
             )
         }
 

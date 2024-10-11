@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 fun EncryptionDialog(
     onDismiss: () -> Unit,
     models: List<Downloadable>,
-    onEncrypt: (Downloadable) -> Unit
+    onEncrypt: (Downloadable) -> Unit,
+    viewModel: MainViewModel
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -29,13 +30,20 @@ fun EncryptionDialog(
         text = {
             Column {
                 models.forEach { model ->
+                    val progress = viewModel.encryptionProgress[model.name] ?: 0f
+                    val buttonText = if (progress > 0f && progress < 1f) {
+                        "${model.name} (${(progress * 100).toInt()}%)"
+                    } else {
+                        model.name
+                    }
                     Button(
                         onClick = { onEncrypt(model) },
+                        enabled = progress == 0f || progress >= 1f,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
                     ) {
-                        Text(model.name)
+                        Text(buttonText)
                     }
                 }
             }
@@ -43,7 +51,7 @@ fun EncryptionDialog(
         confirmButton = {},
         dismissButton = {
             Button(onClick = onDismiss) {
-                Text("Cancel")
+                Text("Close")
             }
         }
     )

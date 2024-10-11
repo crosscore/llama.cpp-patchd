@@ -38,6 +38,7 @@ class ModelCrypto {
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .setKeySize(KEY_SIZE)
+                .setUserAuthenticationRequired(false)
                 .build()
 
             keyGenerator.init(keyGenParameterSpec)
@@ -45,47 +46,79 @@ class ModelCrypto {
         }
     }
 
-    fun encryptModel(inputStream: InputStream, outputStream: OutputStream) {
+    fun encryptModel(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        totalSize: Long,
+        onProgress: (Float) -> Unit
+    ) {
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, getOrCreateSecretKey())
 
         val iv = cipher.iv
         outputStream.write(iv)
 
-        val buffer = ByteArray(BUFFER_SIZE)
-        var bytesRead: Int
+        inputStream.use { input ->
+            outputStream.use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                var bytesProcessed = 0L
 
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            val encryptedBytes = cipher.update(buffer, 0, bytesRead)
-            outputStream.write(encryptedBytes)
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    val encryptedBytes = cipher.update(buffer, 0, bytesRead)
+                    if (encryptedBytes != null) {
+                        output.write(encryptedBytes)
+                    }
+                    bytesProcessed += bytesRead
+                    val progress = bytesProcessed.toFloat() / totalSize
+                    onProgress(progress)
+                }
+
+                val finalBytes = cipher.doFinal()
+                if (finalBytes != null) {
+                    output.write(finalBytes)
+                }
+                onProgress(1f) // 暗号化完了を通知
+            }
         }
-
-        val finalBytes = cipher.doFinal()
-        outputStream.write(finalBytes)
-
-        inputStream.close()
-        outputStream.close()
     }
 
-    fun decryptModel(inputStream: InputStream, outputStream: OutputStream) {
+    fun decryptModel(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        totalSize: Long,
+        onProgress: (Float) -> Unit
+    ) {
         val iv = ByteArray(IV_SIZE)
-        inputStream.read(iv)
+        if (inputStream.read(iv) != IV_SIZE) {
+            throw IllegalStateException("Invalid IV size")
+        }
 
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.DECRYPT_MODE, getOrCreateSecretKey(), GCMParameterSpec(TAG_SIZE, iv))
 
-        val buffer = ByteArray(BUFFER_SIZE)
-        var bytesRead: Int
+        inputStream.use { input ->
+            outputStream.use { output ->
+                val buffer = ByteArray(BUFFER_SIZE)
+                var bytesRead: Int
+                var bytesProcessed = 0L
 
-        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-            val decryptedBytes = cipher.update(buffer, 0, bytesRead)
-            outputStream.write(decryptedBytes)
+                while (input.read(buffer).also { bytesRead = it } != -1) {
+                    val decryptedBytes = cipher.update(buffer, 0, bytesRead)
+                    if (decryptedBytes != null) {
+                        output.write(decryptedBytes)
+                    }
+                    bytesProcessed += bytesRead
+                    val progress = bytesProcessed.toFloat() / totalSize
+                    onProgress(progress)
+                }
+
+                val finalBytes = cipher.doFinal()
+                if (finalBytes != null) {
+                    output.write(finalBytes)
+                }
+                onProgress(1f) // 復号化完了を通知
+            }
         }
-
-        val finalBytes = cipher.doFinal()
-        outputStream.write(finalBytes)
-
-        inputStream.close()
-        outputStream.close()
     }
 }
