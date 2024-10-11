@@ -12,10 +12,10 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -157,15 +157,24 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 val totalSize = inputFile.length()
                 encryptionProgress[model.name] = 0f
 
+                // 進捗ログ出力のための変数を追加
+                var lastLoggedPercent = 0
+
                 ModelCrypto().encryptModelFlow(
                     inputStream = FileInputStream(inputFile),
                     outputStream = FileOutputStream(encryptedFile),
                     totalSize = totalSize
                 )
-                    .flowOn(Dispatchers.IO) // 暗号化処理をIOスレッドで実行
+                    .flowOn(Dispatchers.IO) // フローをIOディスパッチャで実行
                     .collect { progress ->
                         // メインスレッドで進捗を更新
                         encryptionProgress[model.name] = progress
+
+                        val currentPercent = (progress * 100).toInt()
+                        if (currentPercent > lastLoggedPercent) {
+                            lastLoggedPercent = currentPercent
+                            Log.d("EncryptionProgress", "Progress for ${model.name}: ${currentPercent}%")
+                        }
                     }
                 encryptionProgress.remove(model.name)
                 log("Model encrypted: ${encryptedFile.absolutePath}")
