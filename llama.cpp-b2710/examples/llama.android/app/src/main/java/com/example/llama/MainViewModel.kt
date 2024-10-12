@@ -186,7 +186,17 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         viewModelScope.launch {
             try {
                 val inputFile: File = model.file
-                val decryptedFile = File(inputFile.parent, inputFile.name.removeSuffix(".enc"))
+                // ".enc" を取り除く
+                val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
+                val decryptedFileName = if (nameWithoutEncExtension.contains('.')) {
+                    val lastDotIndex = nameWithoutEncExtension.lastIndexOf('.')
+                    val baseName = nameWithoutEncExtension.substring(0, lastDotIndex)
+                    val extension = nameWithoutEncExtension.substring(lastDotIndex) // ドットを含む
+                    "${baseName}_dec${extension}"
+                } else {
+                    "${nameWithoutEncExtension}_dec"
+                }
+                val decryptedFile = File(inputFile.parent, decryptedFileName)
                 val totalSize = inputFile.length()
                 decryptionProgress[model.name] = 0f
                 var lastLoggedPercent = 0
