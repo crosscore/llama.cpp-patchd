@@ -178,6 +178,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             } catch (e: Exception) {
                 encryptionProgress.remove(model.name)
                 log("Encryption failed: ${e.message}")
+                Log.e("EncryptionError", "Error during encryption", e)
             }
         }
     }
@@ -186,7 +187,6 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         viewModelScope.launch {
             try {
                 val inputFile: File = model.file
-                // ".enc" を取り除く
                 val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
                 val decryptedFileName = if (nameWithoutEncExtension.contains('.')) {
                     val lastDotIndex = nameWithoutEncExtension.lastIndexOf('.')
@@ -221,6 +221,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             } catch (e: Exception) {
                 decryptionProgress.remove(model.name)
                 log("Decryption failed: ${e.message}")
+                Log.e("DecryptionError", "Error during decryption", e)
             }
         }
     }
