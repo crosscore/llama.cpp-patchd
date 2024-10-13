@@ -56,9 +56,6 @@ class MainActivity : ComponentActivity() {
         // 初期モデルリストのロード
         loadModels()
 
-        // ViewModelがモデルの更新を通知するために、LiveDataやStateFlowを使用することもできます。
-        // ここではシンプルに `loadModels()` を呼び出す形にします。
-
         setContent {
             var showEncryptionDialog by remember { mutableStateOf(false) }
             var showDecryptionDialog by remember { mutableStateOf(false) }

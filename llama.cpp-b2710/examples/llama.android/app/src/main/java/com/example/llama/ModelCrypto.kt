@@ -25,7 +25,7 @@ class ModelCrypto {
 
     // 鍵を生成または取得。簡単のためにハードコードされた鍵を使用。
     private fun getSecretKey(): SecretKey {
-        // 注意: 以下の鍵は例示目的であり、実際のアプリケーションでは安全な方法で鍵を管理してください。
+        // 注意: 以下の鍵は例示目的
         val keyBytes = ByteArray(KEY_SIZE) { 0x00 }
         return SecretKeySpec(keyBytes, "AES")
     }
