@@ -12,10 +12,8 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.onCompletion
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -63,6 +61,9 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     val decryptionProgress = mutableStateMapOf<String, Float>()
 
     private var sendJob: Job? = null
+
+    // モデル操作完了時のコールバック
+    var onModelOperationCompleted: (() -> Unit)? = null
 
     override fun onCleared() {
         super.onCleared()
@@ -162,9 +163,8 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                     outputStream = FileOutputStream(encryptedFile),
                     totalSize = totalSize
                 )
-                    .flowOn(Dispatchers.IO) // フローをIOディスパッチャで実行
+                    .flowOn(Dispatchers.IO)
                     .collect { progress ->
-                        // メインスレッドで進捗を更新
                         encryptionProgress[model.name] = progress
 
                         val currentPercent = (progress * 100).toInt()
@@ -175,6 +175,9 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                     }
                 encryptionProgress.remove(model.name)
                 log("Model encrypted: ${encryptedFile.absolutePath}")
+
+                // モデルリストを更新するためにコールバックを呼び出す
+                onModelOperationCompleted?.invoke()
             } catch (e: Exception) {
                 encryptionProgress.remove(model.name)
                 log("Encryption failed: ${e.message}")
@@ -188,15 +191,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             try {
                 val inputFile: File = model.file
                 val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
-                val decryptedFileName = if (nameWithoutEncExtension.contains('.')) {
-                    val lastDotIndex = nameWithoutEncExtension.lastIndexOf('.')
-                    val baseName = nameWithoutEncExtension.substring(0, lastDotIndex)
-                    val extension = nameWithoutEncExtension.substring(lastDotIndex) // ドットを含む
-                    "${baseName}_dec${extension}"
-                } else {
-                    "${nameWithoutEncExtension}_dec"
-                }
-                val decryptedFile = File(inputFile.parent, decryptedFileName)
+                val decryptedFile = File(inputFile.parent, nameWithoutEncExtension)
                 val totalSize = inputFile.length()
                 decryptionProgress[model.name] = 0f
                 var lastLoggedPercent = 0
@@ -218,6 +213,9 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                     }
                 decryptionProgress.remove(model.name)
                 log("Model decrypted: ${decryptedFile.absolutePath}")
+
+                // モデルリストを更新するためにコールバックを呼び出す
+                onModelOperationCompleted?.invoke()
             } catch (e: Exception) {
                 decryptionProgress.remove(model.name)
                 log("Decryption failed: ${e.message}")

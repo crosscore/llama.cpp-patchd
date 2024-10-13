@@ -16,16 +16,12 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -42,11 +38,8 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
-    private fun availableMemory(): ActivityManager.MemoryInfo {
-        return ActivityManager.MemoryInfo().also { memoryInfo ->
-            activityManager.getMemoryInfo(memoryInfo)
-        }
-    }
+    // モデルリストをステートとして保持
+    private val models = mutableStateListOf<Downloadable>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,12 +50,55 @@ class MainActivity : ComponentActivity() {
                 .build()
         )
 
-        val free = Formatter.formatFileSize(this, availableMemory().availMem)
-        val total = Formatter.formatFileSize(this, availableMemory().totalMem)
-
-        viewModel.log("Current memory: $free / $total")
+        viewModel.log("Current memory: ${Formatter.formatFileSize(this, availableMemory().availMem)} / ${Formatter.formatFileSize(this, availableMemory().totalMem)}")
         viewModel.log("Downloads directory: ${getExternalFilesDir(null)}")
 
+        // 初期モデルリストのロード
+        loadModels()
+
+        // ViewModelがモデルの更新を通知するために、LiveDataやStateFlowを使用することもできます。
+        // ここではシンプルに `loadModels()` を呼び出す形にします。
+
+        setContent {
+            var showEncryptionDialog by remember { mutableStateOf(false) }
+            var showDecryptionDialog by remember { mutableStateOf(false) }
+            var showModelDialog by remember { mutableStateOf(false) }
+
+            LlamaAndroidTheme {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    MainCompose(
+                        viewModel = viewModel,
+                        clipboard = clipboardManager,
+                        dm = downloadManager,
+                        models = models,
+                        showEncryptionDialog = showEncryptionDialog,
+                        onShowEncryptionDialog = { showEncryptionDialog = it },
+                        showDecryptionDialog = showDecryptionDialog,
+                        onShowDecryptionDialog = { showDecryptionDialog = it },
+                        showModelDialog = showModelDialog,
+                        onShowModelDialog = { showModelDialog = it }
+                    )
+                }
+            }
+        }
+
+        // ViewModelのモデルロード完了時にモデルリストを再読み込みするリスナーを設定
+        viewModel.onModelOperationCompleted = {
+            loadModels()
+        }
+    }
+
+    private fun availableMemory(): ActivityManager.MemoryInfo {
+        return ActivityManager.MemoryInfo().also { memoryInfo ->
+            activityManager.getMemoryInfo(memoryInfo)
+        }
+    }
+
+    // モデルリストをロードまたはリロードする関数
+    private fun loadModels() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
@@ -76,40 +112,19 @@ class MainActivity : ComponentActivity() {
             )
         } ?: emptyList()
 
-        val models = listOf(
+        // 固定のモデルとダウンロードされたモデルを結合
+        val initialModels = listOf(
             Downloadable(
                 "Phi 2 DPO (Q3_K_M, 1.48 GiB)",
                 Uri.parse("https://huggingface.co/TheBloke/phi-2-dpo-GGUF/resolve/main/phi-2-dpo.Q3_K_M.gguf?download=true"),
                 File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf"),
                 sha256 = "e7effd3e3a3b6f1c05b914deca7c9646210bad34576d39d3c5c5f2a25cb97ae1"
             ),
-        ) + downloadedModels
+        )
 
-        setContent {
-            var showEncryptionDialog by remember { mutableStateOf(false) }
-            var showDecryptionDialog by remember { mutableStateOf(false) }
-            var showModelDialog by remember { mutableStateOf(false) }
-
-            LlamaAndroidTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    MainCompose(
-                        viewModel,
-                        clipboardManager,
-                        downloadManager,
-                        models,
-                        showEncryptionDialog,
-                        onShowEncryptionDialog = { showEncryptionDialog = it },
-                        showDecryptionDialog,
-                        onShowDecryptionDialog = { showDecryptionDialog = it },
-                        showModelDialog,
-                        onShowModelDialog = { showModelDialog = it }
-                    )
-                }
-            }
-        }
+        // モデルリストを更新
+        models.clear()
+        models.addAll(initialModels + downloadedModels)
     }
 }
 
@@ -169,29 +184,9 @@ fun MainCompose(
                 state = messageListState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                itemsIndexed(viewModel.messages) { _, messagePair ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp)
-                            .padding(8.dp)
-                    ) {
-                        if (messagePair.first == "[System]") {
-                            Text(
-                                text = messagePair.second,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        } else {
-                            Text(
-                                text = "User: ${messagePair.first}",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text(
-                                text = "LLM: ${messagePair.second}",
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                        }
-                    }
+                items(models) { model ->
+                    //DownloadableButton(viewModel, dm, model)
+                    Spacer(modifier = Modifier.height(4.dp))
                 }
             }
         }
@@ -308,6 +303,15 @@ fun MainCompose(
                 viewModel = viewModel,
                 dm = dm
             )
+        }
+    }
+
+    @Composable
+    fun DownloadableButton(viewModel: MainViewModel, dm: DownloadManager, model: Downloadable) {
+        // 実装内容に応じてボタンの実装を行ってください。
+        // ここでは仮のボタンとして実装します。
+        Button(onClick = { /* モデルを処理するロジック */ }) {
+            Text(model.name)
         }
     }
 }
