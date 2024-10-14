@@ -50,7 +50,14 @@ class MainActivity : ComponentActivity() {
                 .build()
         )
 
-        viewModel.log("Current memory: ${Formatter.formatFileSize(this, availableMemory().availMem)} / ${Formatter.formatFileSize(this, availableMemory().totalMem)}")
+        viewModel.log(
+            "Current memory: ${
+                Formatter.formatFileSize(
+                    this,
+                    availableMemory().availMem
+                )
+            } / ${Formatter.formatFileSize(this, availableMemory().totalMem)}"
+        )
         viewModel.log("Downloads directory: ${getExternalFilesDir(null)}")
 
         // 初期モデルリストのロード
@@ -109,7 +116,6 @@ class MainActivity : ComponentActivity() {
             )
         } ?: emptyList()
 
-        // 固定のモデルとダウンロードされたモデルを結合
         val initialModels = listOf(
             Downloadable(
                 "Phi 2 DPO (Q3_K_M, 1.48 GiB)",
@@ -181,9 +187,10 @@ fun MainCompose(
                 state = messageListState,
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(models) { model ->
-                    //DownloadableButton(viewModel, dm, model)
-                    Spacer(modifier = Modifier.height(4.dp))
+                items(viewModel.messages) { (userMessage, llmResponse) ->
+                    Text(text = "User: $userMessage")
+                    Text(text = "LLM: $llmResponse")
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -300,15 +307,6 @@ fun MainCompose(
                 viewModel = viewModel,
                 dm = dm
             )
-        }
-    }
-
-    @Composable
-    fun DownloadableButton(viewModel: MainViewModel, dm: DownloadManager, model: Downloadable) {
-        // 実装内容に応じてボタンの実装を行ってください。
-        // ここでは仮のボタンとして実装します。
-        Button(onClick = { /* モデルを処理するロジック */ }) {
-            Text(model.name)
         }
     }
 }

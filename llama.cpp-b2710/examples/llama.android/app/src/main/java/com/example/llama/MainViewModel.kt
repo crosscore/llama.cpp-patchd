@@ -9,11 +9,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -153,14 +150,18 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         viewModelScope.launch {
             try {
                 val inputFile: File = model.file
-                val encryptedFile = File(inputFile.parent, "${inputFile.name}.enc")
+
+                // 既存の暗号化ファイルが存在する場合、ユニークな名前を生成
+                val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
+                val uniqueEncryptedFile = generateUniqueEncryptedFile(directory, inputFile.name)
+
                 val totalSize = inputFile.length()
                 encryptionProgress[model.name] = 0f
                 var lastLoggedPercent = 0
 
                 ModelCrypto().encryptModelFlow(
                     inputStream = FileInputStream(inputFile),
-                    outputStream = FileOutputStream(encryptedFile),
+                    outputStream = FileOutputStream(uniqueEncryptedFile),
                     totalSize = totalSize
                 )
                     .flowOn(Dispatchers.IO)
@@ -174,7 +175,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                         }
                     }
                 encryptionProgress.remove(model.name)
-                log("Model encrypted: ${encryptedFile.absolutePath}")
+                log("Model encrypted: ${uniqueEncryptedFile.absolutePath}")
 
                 // モデルリストを更新するためにコールバックを呼び出す
                 onModelOperationCompleted?.invoke()
@@ -186,13 +187,39 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
+    // ユニークな暗号化ファイル名を生成するヘルパー関数
+    private fun generateUniqueEncryptedFile(directory: File, originalName: String): File {
+        // 既に .enc 拡張子が付いている場合はベースネームから .enc を削除
+        val baseName = if (originalName.endsWith(".enc")) {
+            originalName.removeSuffix(".enc")
+        } else {
+            originalName
+        }
+        var index = 1
+        var newFile = File(directory, "$baseName.enc")
+        while (newFile.exists()) {
+            newFile = File(directory, "${baseName}_$index.enc")
+            index++
+        }
+        return newFile
+    }
+
     fun decryptModel(model: Downloadable) {
         viewModelScope.launch {
             try {
                 val inputFile: File = model.file
                 val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
-                val decryptedFile = File(inputFile.parent, nameWithoutEncExtension)
-                val totalSize = inputFile.length()
+
+                // ファイル名と拡張子を分離
+                val file = File(nameWithoutEncExtension)
+                val baseName = file.nameWithoutExtension
+                val extension = if (file.extension.isNotEmpty()) ".${file.extension}" else ""
+
+                // 既存の復号化ファイルが存在する場合、ユニークな名前を生成
+                val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
+                val decryptedFile = generateUniqueDecryptedFile(directory, baseName, extension)
+                val totalSize = inputFile.length() - 16 // IVサイズを除く
+
                 decryptionProgress[model.name] = 0f
                 var lastLoggedPercent = 0
 
@@ -222,6 +249,16 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 Log.e("DecryptionError", "Error during decryption", e)
             }
         }
+    }
+
+    private fun generateUniqueDecryptedFile(directory: File, baseName: String, extension: String): File {
+        var index = 1
+        var newFile = File(directory, "$baseName$extension")
+        while (newFile.exists()) {
+            newFile = File(directory, "${baseName}_$index$extension")
+            index++
+        }
+        return newFile
     }
 
     fun load(pathToModel: String) {
@@ -275,3 +312,5 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 }
+
+
