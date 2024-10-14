@@ -203,3 +203,225 @@
 2024-10-14 09:52:56.466 25714-25714 WindowOnBackDispatcher  com.example.llama                    W  sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@a643481
 2024-10-14 09:53:22.185 25714-25714 WindowOnBackDispatcher  com.example.llama                    W  sendCancelIfRunning: isInProgress=falsecallback=android.view.ViewRootImpl$$ExternalSyntheticLambda11@c828aec
 2024-10-14 09:53:32.434 25714-25714 WindowOnBackDispatcher  com.example.llama                    W  sendCancelIfRunning: isInProgress=falsecallback=ImeCallback=ImeOnBackInvokedCallback@110221628 Callback=android.window.IOnBackInvokedCallback$Stub$Proxy@50474f0
+
+
+
+
+2024-10-14 14:57:40.770  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 1%
+2024-10-14 14:57:41.643  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 2%
+2024-10-14 14:57:42.490  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 3%
+2024-10-14 14:57:43.409  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 4%
+2024-10-14 14:57:44.282  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 5%
+2024-10-14 14:57:45.157  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 6%
+2024-10-14 14:57:46.122  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 7%
+2024-10-14 14:57:47.046  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 8%
+2024-10-14 14:57:48.016  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 9%
+2024-10-14 14:57:48.795  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 10%
+2024-10-14 14:57:49.807  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 7118KB/30MB, paused 183us,5.554ms total 45.762ms
+2024-10-14 14:57:50.110  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 11%
+2024-10-14 14:57:50.895  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 12%
+2024-10-14 14:57:51.712  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 13%
+2024-10-14 14:57:52.593  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 14%
+2024-10-14 14:57:53.068  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 27MB AllocSpace bytes, 0(0B) LOS objects, 75% free, 7842KB/31MB, paused 259us,6.743ms total 50.975ms
+2024-10-14 14:57:53.511  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 15%
+2024-10-14 14:57:54.423  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 16%
+2024-10-14 14:57:55.914  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 17%
+2024-10-14 14:57:56.615  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 18%
+2024-10-14 14:57:57.548  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 19%
+2024-10-14 14:57:58.471  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 20%
+2024-10-14 14:57:59.243  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 21%
+2024-10-14 14:58:00.748  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 22%
+2024-10-14 14:58:01.500  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 23%
+2024-10-14 14:58:02.242  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 24%
+2024-10-14 14:58:03.063  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 25%
+2024-10-14 14:58:03.940  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 26%
+2024-10-14 14:58:04.845  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 27%
+2024-10-14 14:58:06.194  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 28%
+2024-10-14 14:58:06.857  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 29%
+2024-10-14 14:58:07.618  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 30%
+2024-10-14 14:58:08.490  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 31%
+2024-10-14 14:58:09.372  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 32%
+2024-10-14 14:58:10.323  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 33%
+2024-10-14 14:58:10.757  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 28MB AllocSpace bytes, 0(0B) LOS objects, 75% free, 7762KB/31MB, paused 371us,5.003ms total 42.642ms
+2024-10-14 14:58:11.173  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 34%
+2024-10-14 14:58:12.000  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 35%
+2024-10-14 14:58:12.959  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 36%
+2024-10-14 14:58:13.791  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 37%
+2024-10-14 14:58:14.582  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 38%
+2024-10-14 14:58:15.367  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 39%
+2024-10-14 14:58:16.752  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 40%
+2024-10-14 14:58:17.403  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 41%
+2024-10-14 14:58:18.159  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 42%
+2024-10-14 14:58:18.883  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 27MB AllocSpace bytes, 0(0B) LOS objects, 75% free, 8174KB/31MB, paused 257us,5.463ms total 47.772ms
+2024-10-14 14:58:19.001  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 43%
+2024-10-14 14:58:20.192  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 44%
+2024-10-14 14:58:21.741  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 45%
+2024-10-14 14:58:22.421  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 46%
+2024-10-14 14:58:23.153  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 47%
+2024-10-14 14:58:23.992  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 48%
+2024-10-14 14:58:24.870  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 49%
+2024-10-14 14:58:25.693  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 50%
+2024-10-14 14:58:27.019  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 51%
+2024-10-14 14:58:27.631  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 52%
+2024-10-14 14:58:28.470  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 53%
+2024-10-14 14:58:29.217  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 54%
+2024-10-14 14:58:30.212  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 55%
+2024-10-14 14:58:31.165  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 56%
+2024-10-14 14:58:32.316  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 78% free, 6914KB/30MB, paused 631us,5.228ms total 57.710ms
+2024-10-14 14:58:32.602  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 57%
+2024-10-14 14:58:33.241  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 58%
+2024-10-14 14:58:33.974  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 59%
+2024-10-14 14:58:34.809  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 60%
+2024-10-14 14:58:35.683  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 61%
+2024-10-14 14:58:36.443  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 62%
+2024-10-14 14:58:37.879  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 63%
+2024-10-14 14:58:38.612  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 64%
+2024-10-14 14:58:39.343  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 65%
+2024-10-14 14:58:40.105  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 66%
+2024-10-14 14:58:41.073  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 67%
+2024-10-14 14:58:42.212  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 68%
+2024-10-14 14:58:43.333  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 69%
+2024-10-14 14:58:44.114  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 70%
+2024-10-14 14:58:44.862  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 71%
+2024-10-14 14:58:45.762  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 72%
+2024-10-14 14:58:46.564  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 73%
+2024-10-14 14:58:48.208  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 74%
+2024-10-14 14:58:48.813  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 75%
+2024-10-14 14:58:49.529  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 76%
+2024-10-14 14:58:50.277  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 77%
+2024-10-14 14:58:51.246  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 78%
+2024-10-14 14:58:52.162  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 79%
+2024-10-14 14:58:53.713  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 80%
+2024-10-14 14:58:54.310  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 81%
+2024-10-14 14:58:55.076  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 82%
+2024-10-14 14:58:55.850  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 83%
+2024-10-14 14:58:56.782  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 84%
+2024-10-14 14:58:57.690  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 85%
+2024-10-14 14:58:59.592  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 86%
+2024-10-14 14:59:00.164  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 87%
+2024-10-14 14:59:00.915  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 88%
+2024-10-14 14:59:01.742  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 89%
+2024-10-14 14:59:02.519  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 90%
+2024-10-14 14:59:03.643  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 91%
+2024-10-14 14:59:04.641  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 92%
+2024-10-14 14:59:05.623  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 93%
+2024-10-14 14:59:06.609  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 94%
+2024-10-14 14:59:07.589  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 95%
+2024-10-14 14:59:09.068  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 96%
+2024-10-14 14:59:09.738  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 97%
+2024-10-14 14:59:10.470  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 98%
+2024-10-14 14:59:11.274  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 99%
+2024-10-14 14:59:12.306  7608-7608  EncryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf: 100%
+2024-10-14 14:59:12.307  7608-7733  ModelCrypto             com.example.llama                    D  Encryption completed. Total bytes processed: 7560689024
+
+
+2024-10-14 14:59:47.778  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 1%
+2024-10-14 14:59:48.521  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 2%
+2024-10-14 14:59:49.321  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 3%
+2024-10-14 14:59:50.463  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 4%
+2024-10-14 14:59:51.643  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 5%
+2024-10-14 14:59:52.499  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 6%
+2024-10-14 14:59:53.312  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 7%
+2024-10-14 14:59:54.161  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 8%
+2024-10-14 14:59:55.865  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 9%
+2024-10-14 14:59:56.924  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 10%
+2024-10-14 14:59:57.583  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 11%
+2024-10-14 14:59:58.334  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 12%
+2024-10-14 14:59:59.174  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 13%
+2024-10-14 15:00:00.568  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 14%
+2024-10-14 15:00:01.624  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 15%
+2024-10-14 15:00:02.789  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 16%
+2024-10-14 15:00:04.137  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 17%
+2024-10-14 15:00:05.033  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 18%
+2024-10-14 15:00:07.346  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 19%
+2024-10-14 15:00:08.031  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 20%
+2024-10-14 15:00:08.712  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 21%
+2024-10-14 15:00:09.458  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 22%
+2024-10-14 15:00:10.288  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 23%
+2024-10-14 15:00:12.565  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 7045KB/30MB, paused 930us,5.366ms total 59.501ms
+2024-10-14 15:00:12.658  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 24%
+2024-10-14 15:00:13.437  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 25%
+2024-10-14 15:00:13.901  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 26%
+2024-10-14 15:00:14.610  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 27%
+2024-10-14 15:00:15.502  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 28%
+2024-10-14 15:00:17.313  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 29%
+2024-10-14 15:00:17.532  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 7209KB/31MB, paused 752us,5.221ms total 53.744ms
+2024-10-14 15:00:18.470  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 26MB AllocSpace bytes, 0(0B) LOS objects, 76% free, 7661KB/31MB, paused 244us,6.502ms total 41.959ms
+2024-10-14 15:00:18.621  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 30%
+2024-10-14 15:00:19.362  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 31%
+2024-10-14 15:00:20.050  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 32%
+2024-10-14 15:00:20.848  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 33%
+2024-10-14 15:00:21.607  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 34%
+2024-10-14 15:00:22.502  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 35%
+2024-10-14 15:00:23.452  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 36%
+2024-10-14 15:00:24.372  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 37%
+2024-10-14 15:00:25.691  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 38%
+2024-10-14 15:00:27.212  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 39%
+2024-10-14 15:00:28.447  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 78% free, 6685KB/30MB, paused 242us,5.159ms total 75.328ms
+2024-10-14 15:00:29.137  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 40%
+2024-10-14 15:00:29.897  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 41%
+2024-10-14 15:00:30.539  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 42%
+2024-10-14 15:00:31.362  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 43%
+2024-10-14 15:00:32.390  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 44%
+2024-10-14 15:00:33.187  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 45%
+2024-10-14 15:00:33.934  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 46%
+2024-10-14 15:00:34.925  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 47%
+2024-10-14 15:00:35.747  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 48%
+2024-10-14 15:00:36.697  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 49%
+2024-10-14 15:00:38.910  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 50%
+2024-10-14 15:00:39.917  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 51%
+2024-10-14 15:00:40.694  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 52%
+2024-10-14 15:00:41.351  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 53%
+2024-10-14 15:00:42.332  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 54%
+2024-10-14 15:00:44.580  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 55%
+2024-10-14 15:00:45.345  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 56%
+2024-10-14 15:00:46.209  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 57%
+2024-10-14 15:00:47.002  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 58%
+2024-10-14 15:00:48.447  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 59%
+2024-10-14 15:00:49.978  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 24MB AllocSpace bytes, 0(0B) LOS objects, 78% free, 6621KB/30MB, paused 417us,6.601ms total 66.553ms
+2024-10-14 15:00:50.402  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 60%
+2024-10-14 15:00:51.054  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 61%
+2024-10-14 15:00:51.786  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 62%
+2024-10-14 15:00:52.555  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 63%
+2024-10-14 15:00:53.776  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 64%
+2024-10-14 15:00:54.875  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 65%
+2024-10-14 15:00:56.010  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 66%
+2024-10-14 15:00:56.724  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 67%
+2024-10-14 15:00:57.636  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 68%
+2024-10-14 15:00:59.035  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 69%
+2024-10-14 15:00:59.895  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 70%
+2024-10-14 15:01:01.153  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 71%
+2024-10-14 15:01:02.367  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 72%
+2024-10-14 15:01:03.618  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 73%
+2024-10-14 15:01:05.815  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 74%
+2024-10-14 15:01:06.402  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 75%
+2024-10-14 15:01:07.036  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 76%
+2024-10-14 15:01:08.186  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 77%
+2024-10-14 15:01:09.470  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 78%
+2024-10-14 15:01:10.093  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 79%
+2024-10-14 15:01:10.964  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 80%
+2024-10-14 15:01:11.979  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 81%
+2024-10-14 15:01:12.850  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 82%
+2024-10-14 15:01:13.848  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 83%
+2024-10-14 15:01:15.862  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 84%
+2024-10-14 15:01:16.695  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 85%
+2024-10-14 15:01:17.445  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 86%
+2024-10-14 15:01:18.102  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 87%
+2024-10-14 15:01:18.832  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 88%
+2024-10-14 15:01:20.251  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 89%
+2024-10-14 15:01:21.228  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 78% free, 6721KB/30MB, paused 804us,5.082ms total 55.456ms
+2024-10-14 15:01:21.698  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 90%
+2024-10-14 15:01:22.343  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 91%
+2024-10-14 15:01:23.228  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 92%
+2024-10-14 15:01:23.944  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 93%
+2024-10-14 15:01:25.079  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 25MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 6997KB/30MB, paused 919us,6.130ms total 60.758ms
+2024-10-14 15:01:25.935  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 94%
+2024-10-14 15:01:25.939  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 24MB AllocSpace bytes, 0(0B) LOS objects, 77% free, 7273KB/31MB, paused 546us,5.628ms total 35.205ms
+2024-10-14 15:01:26.807  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 95%
+2024-10-14 15:01:27.441  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 96%
+2024-10-14 15:01:28.107  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 97%
+2024-10-14 15:01:29.076  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 98%
+2024-10-14 15:01:30.393  7608-7613  m.example.llama         com.example.llama                    I  Background concurrent mark compact GC freed 24MB AllocSpace bytes, 0(0B) LOS objects, 78% free, 6873KB/30MB, paused 216us,5.464ms total 57.835ms
+2024-10-14 15:01:30.668  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 99%
+2024-10-14 15:01:33.427  7608-7608  DecryptionProgress      com.example.llama                    D  Progress for tsuzumi-v1-2-7b-instruct-Q8_0.gguf.enc: 100%
+2024-10-14 15:01:33.428  7608-7734  ModelCrypto             com.example.llama                    D  Decryption completed. Total bytes processed: 7560689024
