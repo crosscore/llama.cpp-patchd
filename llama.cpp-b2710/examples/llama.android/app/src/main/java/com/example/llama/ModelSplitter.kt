@@ -1,54 +1,26 @@
-// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/ModelSplitter.kt
 package com.example.llama
 
 import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import java.io.*
-import java.security.KeyStore
-import java.security.SecureRandom
-import javax.crypto.Cipher
-import javax.crypto.CipherInputStream
-import javax.crypto.CipherOutputStream
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
 
 class ModelSplitter(private val context: Context) {
     companion object {
         private const val BUFFER_SIZE = 8192
-        private const val KEY_ALIAS = "ModelMergeKey"
-        private const val TRANSFORMATION = "AES/CTR/NoPadding"
-        private const val IV_SIZE = 16  // 128 bits
     }
 
-    private fun getSecretKey(): SecretKey {
-        val keyStore = KeyStore.getInstance("AndroidKeyStore")
-        keyStore.load(null)
-        val keyEntry = keyStore.getEntry(KEY_ALIAS, null)
-        return if (keyEntry != null && keyEntry is KeyStore.SecretKeyEntry) {
-            keyEntry.secretKey
-        } else {
-            val keyGenerator = KeyGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_AES,
-                "AndroidKeyStore"
-            )
-            val keyGenParameterSpec = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_CTR)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setUserAuthenticationRequired(false)
-                .build()
-            keyGenerator.init(keyGenParameterSpec)
-            keyGenerator.generateKey()
-        }
-    }
-
+    /**
+     * モデルファイルを指定したパートサイズで分割する。
+     * 暗号化は行わず、単純にファイルを分割する。
+     *
+     * @param inputFile 分割対象のモデルファイル
+     * @param outputDir 分割後のパートファイルを保存するディレクトリ
+     * @param partSizeBytes 各パートのサイズ（バイト単位）
+     * @return 分割進捗を表す Flow<Float>（0.0f ～ 1.0f）
+     */
     fun splitModelFlow(
         inputFile: File,
         outputDir: File,
@@ -56,54 +28,48 @@ class ModelSplitter(private val context: Context) {
     ): Flow<Float> = flow {
         try {
             val totalSize = inputFile.length()
-            val inputStream = FileInputStream(inputFile)
-            val secretKey = getSecretKey()
+            FileInputStream(inputFile).use { inputStream ->
+                var bytesProcessed = 0L
+                var partIndex = 1
 
-            var bytesProcessed = 0L
-            var partIndex = 1
+                while (bytesProcessed < totalSize) {
+                    val remaining = totalSize - bytesProcessed
+                    val currentPartSize = minOf(partSizeBytes, remaining)
+                    val outputFile = File(outputDir, "${inputFile.name}.part$partIndex")
 
-            while (bytesProcessed < totalSize) {
-                val remaining = totalSize - bytesProcessed
-                val currentPartSize = minOf(partSizeBytes, remaining)
-                val outputFile = File(outputDir, "${inputFile.name}.part$partIndex")
+                    FileOutputStream(outputFile).use { outputStream ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var bytesReadTotal = 0L
 
-                val iv = ByteArray(IV_SIZE)
-                SecureRandom().nextBytes(iv)
-                val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
+                        while (bytesReadTotal < currentPartSize) {
+                            val bytesToRead = minOf(BUFFER_SIZE.toLong(), currentPartSize - bytesReadTotal).toInt()
+                            val bytesRead = inputStream.read(buffer, 0, bytesToRead)
+                            if (bytesRead == -1) break
+                            outputStream.write(buffer, 0, bytesRead)
+                            bytesReadTotal += bytesRead
+                            bytesProcessed += bytesRead
+                            val progress = bytesProcessed.toFloat() / totalSize
+                            emit(progress)
+                        }
+                    }
 
-                val cipher = Cipher.getInstance(TRANSFORMATION)
-                cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec)
-
-                val cipherOutputStream = CipherOutputStream(FileOutputStream(outputFile), cipher)
-
-                cipherOutputStream.write(iv)
-
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesReadTotal = 0L
-
-                while (bytesReadTotal < currentPartSize) {
-                    val bytesToRead = minOf(BUFFER_SIZE.toLong(), currentPartSize - bytesReadTotal).toInt()
-                    val bytesRead = inputStream.read(buffer, 0, bytesToRead)
-                    if (bytesRead == -1) break
-                    cipherOutputStream.write(buffer, 0, bytesRead)
-                    bytesReadTotal += bytesRead
-                    bytesProcessed += bytesRead
-                    val progress = bytesProcessed.toFloat() / totalSize
-                    emit(progress)
+                    partIndex++
                 }
-
-                cipherOutputStream.flush()
-                cipherOutputStream.close()
-                partIndex++
             }
-
-            inputStream.close()
             emit(1f)
         } catch (e: Exception) {
             throw e
         }
     }.flowOn(Dispatchers.IO)
 
+    /**
+     * 分割されたパートファイルを結合して元のモデルファイルを復元する。
+     * 結合時に秘密鍵を要求するが、暗号化や復号化は行わない。
+     *
+     * @param inputFiles 結合対象のパートファイルのリスト
+     * @param outputFile 結合後のモデルファイル
+     * @return 結合進捗を表す Flow<Float>（0.0f ～ 1.0f）
+     */
     fun mergeModelFlow(
         inputFiles: List<File>,
         outputFile: File
@@ -112,39 +78,24 @@ class ModelSplitter(private val context: Context) {
             val totalSize = inputFiles.sumOf { it.length() }
             var bytesProcessed = 0L
 
-            val outputStream = FileOutputStream(outputFile)
-            val secretKey = getSecretKey()
+            FileOutputStream(outputFile).use { outputStream ->
+                inputFiles.sortedBy {
+                    val partNumber = it.name.substringAfter(".part").toIntOrNull() ?: 0
+                    partNumber
+                }.forEach { inputFile ->
+                    FileInputStream(inputFile).use { inputStream ->
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var bytesRead: Int
 
-            inputFiles.sortedBy { it.name }.forEach { inputFile ->
-                val fileInputStream = FileInputStream(inputFile)
-
-                val iv = ByteArray(IV_SIZE)
-                val ivBytesRead = fileInputStream.read(iv)
-                if (ivBytesRead != IV_SIZE) {
-                    throw IllegalStateException("Invalid IV size in part file: ${inputFile.name}")
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                            bytesProcessed += bytesRead
+                            val progress = bytesProcessed.toFloat() / totalSize
+                            emit(progress)
+                        }
+                    }
                 }
-                val ivSpec = javax.crypto.spec.IvParameterSpec(iv)
-
-                val cipher = Cipher.getInstance(TRANSFORMATION)
-                cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec)
-
-                val cipherInputStream = CipherInputStream(fileInputStream, cipher)
-
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Int
-
-                while (cipherInputStream.read(buffer).also { bytesRead = it } != -1) {
-                    outputStream.write(buffer, 0, bytesRead)
-                    bytesProcessed += bytesRead
-                    val progress = bytesProcessed.toFloat() / totalSize
-                    emit(progress)
-                }
-
-                cipherInputStream.close()
             }
-
-            outputStream.flush()
-            outputStream.close()
             emit(1f)
         } catch (e: Exception) {
             throw e

@@ -370,8 +370,8 @@ fun MainCompose(
             MergeDialog(
                 onDismiss = { onShowMergeDialog(false) },
                 models = models,
-                onMerge = { parts ->
-                    viewModel.mergeModel(parts)
+                onMerge = { parts, secretKey ->
+                    viewModel.mergeModel(parts, secretKey)
                 },
                 viewModel = viewModel
             )

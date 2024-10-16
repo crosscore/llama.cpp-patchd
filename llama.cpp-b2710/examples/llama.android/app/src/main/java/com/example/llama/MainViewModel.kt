@@ -296,8 +296,14 @@ class MainViewModel(
         }
     }
 
-    fun mergeModel(parts: List<Downloadable>) {
+    fun mergeModel(parts: List<Downloadable>, secretKey: String) {
         viewModelScope.launch {
+            // 秘密鍵をチェック（例としてハードコードされた鍵を使用）
+            if (secretKey != "your_secret_key") {
+                log("Invalid secret key provided.")
+                return@launch
+            }
+
             try {
                 if (parts.isEmpty()) {
                     log("No parts selected for merging.")
@@ -305,9 +311,12 @@ class MainViewModel(
                 }
 
                 val outputDir = parts.first().file.parentFile ?: throw IllegalStateException("Parent directory is null")
-                val baseName = parts.first().file.name.substringBefore(".part")
+                val baseNameWithExtension = parts.first().file.name.substringBefore(".part")
+                val file = File(baseNameWithExtension)
+                val baseName = file.nameWithoutExtension
+                val extension = if (file.extension.isNotEmpty()) ".${file.extension}" else ""
 
-                val outputFile = generateUniqueMergedFile(outputDir, baseName)
+                val outputFile = generateUniqueMergedFile(outputDir, baseName, extension)
 
                 mergeProgress[baseName] = 0f
                 var lastLoggedPercent = 0
@@ -339,11 +348,11 @@ class MainViewModel(
         }
     }
 
-    private fun generateUniqueMergedFile(directory: File, baseName: String): File {
+    private fun generateUniqueMergedFile(directory: File, baseName: String, extension: String): File {
         var index = 1
-        var newFile = File(directory, "$baseName.merged")
+        var newFile = File(directory, "$baseName$extension")
         while (newFile.exists()) {
-            newFile = File(directory, "${baseName}_$index.merged")
+            newFile = File(directory, "${baseName}_$index$extension")
             index++
         }
         return newFile

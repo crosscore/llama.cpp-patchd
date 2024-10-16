@@ -75,14 +75,23 @@ fun SplitDialog(
 fun MergeDialog(
     onDismiss: () -> Unit,
     models: List<Downloadable>,
-    onMerge: (List<Downloadable>) -> Unit,
+    onMerge: (List<Downloadable>, String) -> Unit,
     viewModel: MainViewModel
 ) {
+    var secretKey by remember { mutableStateOf("") }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Select model parts to merge") },
         text = {
             Column {
+                OutlinedTextField(
+                    value = secretKey,
+                    onValueChange = { secretKey = it },
+                    label = { Text("Secret Key") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
                 models.filter { it.file.name.contains(".part") }
                     .groupBy { it.file.name.substringBefore(".part") }
                     .forEach { (modelName, parts) ->
@@ -93,7 +102,7 @@ fun MergeDialog(
                             modelName
                         }
                         Button(
-                            onClick = { onMerge(parts) },
+                            onClick = { onMerge(parts, secretKey) },
                             enabled = progress == 0f || progress >= 1f,
                             modifier = Modifier
                                 .fillMaxWidth()
