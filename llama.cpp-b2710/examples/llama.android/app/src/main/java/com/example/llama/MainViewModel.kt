@@ -269,7 +269,7 @@ class MainViewModel(
                 splitProgress[model.name] = 0f
                 var lastLoggedPercent = 0
 
-                val splitter = ModelSplitter(context)
+                val splitter = ModelSplitter()
 
                 splitter.splitModelFlow(
                     inputFile = inputFile,
@@ -299,7 +299,7 @@ class MainViewModel(
     fun mergeModel(parts: List<Downloadable>, secretKey: String) {
         viewModelScope.launch {
             // 秘密鍵をチェック（例としてハードコードされた鍵を使用）
-            if (secretKey != "your_secret_key") {
+            if (secretKey != "42") {
                 log("Invalid secret key provided.")
                 return@launch
             }
@@ -321,7 +321,7 @@ class MainViewModel(
                 mergeProgress[baseName] = 0f
                 var lastLoggedPercent = 0
 
-                val splitter = ModelSplitter(context)
+                val splitter = ModelSplitter()
 
                 splitter.mergeModelFlow(
                     inputFiles = parts.map { it.file },

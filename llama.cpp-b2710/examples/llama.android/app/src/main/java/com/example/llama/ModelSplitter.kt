@@ -1,13 +1,12 @@
 package com.example.llama
 
-import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import java.io.*
 
-class ModelSplitter(private val context: Context) {
+class ModelSplitter {
     companion object {
         private const val BUFFER_SIZE = 8192
     }
