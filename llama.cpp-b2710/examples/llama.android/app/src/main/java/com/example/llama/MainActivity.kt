@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
     private val clipboardManager by lazy { getSystemService<ClipboardManager>()!! }
 
     private val viewModel: MainViewModel by viewModels {
-        MainViewModelFactory(applicationContext)
+        MainViewModelFactory()
     }
 
     // Keep models as a mutable state list
@@ -154,13 +154,11 @@ class MainActivity : ComponentActivity() {
 }
 
 // Factory to provide Context to the ViewModel
-class MainViewModelFactory(
-    private val context: android.content.Context
-) : ViewModelProvider.Factory {
+class MainViewModelFactory : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MainViewModel(context) as T
+            return MainViewModel() as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

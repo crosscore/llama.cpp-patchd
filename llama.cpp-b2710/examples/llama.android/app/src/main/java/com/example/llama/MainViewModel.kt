@@ -1,7 +1,6 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainViewModel.kt
 package com.example.llama
 
-import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
@@ -13,7 +12,6 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 class MainViewModel(
-    private val context: Context,
     private val llm: Llm = Llm.instance()
 ) : ViewModel() {
 
