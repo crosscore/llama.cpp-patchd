@@ -51,6 +51,9 @@ class MainViewModel(
     var loadingModelName by mutableStateOf<String?>(null)
         private set
 
+    var loadingProgress by mutableStateOf<Float?>(null)
+        private set
+
     val encryptionProgress = mutableStateMapOf<String, Float>()
     val decryptionProgress = mutableStateMapOf<String, Float>()
     val splitProgress = mutableStateMapOf<String, Float>()
@@ -316,7 +319,7 @@ class MainViewModel(
 
                 val outputFile = generateUniqueMergedFile(outputDir, baseName, extension)
 
-                mergeProgress[baseName] = 0f
+                mergeProgress[baseNameWithExtension] = 0f
                 var lastLoggedPercent = 0
 
                 val splitter = ModelSplitter()
@@ -325,20 +328,20 @@ class MainViewModel(
                     inputFiles = parts.map { it.file },
                     outputFile = outputFile
                 ).collect { progress ->
-                    mergeProgress[baseName] = progress
+                    mergeProgress[baseNameWithExtension] = progress
 
                     val currentPercent = (progress * 100).toInt()
                     if (currentPercent > lastLoggedPercent) {
                         lastLoggedPercent = currentPercent
-                        Log.d("MergeProgress", "Progress for $baseName: ${currentPercent}%")
+                        Log.d("MergeProgress", "Progress for $baseNameWithExtension: ${currentPercent}%")
                     }
                 }
-                mergeProgress.remove(baseName)
+                mergeProgress.remove(baseNameWithExtension)
                 log("Model merge completed: ${outputFile.absolutePath}")
 
                 onModelOperationCompleted?.invoke()
             } catch (e: Exception) {
-                val modelName = parts.firstOrNull()?.name ?: "Unknown"
+                val modelName = parts.firstOrNull()?.name?.substringBefore(".part") ?: "Unknown"
                 mergeProgress.remove(modelName)
                 log("Merge failed: ${e.message}")
                 Log.e("MergeError", "Error during merging", e)
@@ -364,11 +367,15 @@ class MainViewModel(
 
         isLoading = true
         loadingModelName = File(pathToModel).name
+        loadingProgress = 0f
 
         viewModelScope.launch {
             try {
                 sendJob?.cancel()
                 llm.load(pathToModel, seed, contextSize, numThreads)
+                    .collect { progress ->
+                        loadingProgress = progress
+                    }
                 currentModelPath = pathToModel
                 log("Loaded $pathToModel")
             } catch (exc: IllegalStateException) {
@@ -377,6 +384,7 @@ class MainViewModel(
             } finally {
                 isLoading = false
                 loadingModelName = null
+                loadingProgress = null
             }
         }
     }

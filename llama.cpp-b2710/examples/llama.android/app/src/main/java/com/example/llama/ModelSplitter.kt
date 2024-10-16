@@ -11,15 +11,6 @@ class ModelSplitter {
         private const val BUFFER_SIZE = 8192
     }
 
-    /**
-     * モデルファイルを指定したパートサイズで分割する。
-     * 暗号化は行わず、単純にファイルを分割する。
-     *
-     * @param inputFile 分割対象のモデルファイル
-     * @param outputDir 分割後のパートファイルを保存するディレクトリ
-     * @param partSizeBytes 各パートのサイズ（バイト単位）
-     * @return 分割進捗を表す Flow<Float>（0.0f ～ 1.0f）
-     */
     fun splitModelFlow(
         inputFile: File,
         outputDir: File,
@@ -61,14 +52,6 @@ class ModelSplitter {
         }
     }.flowOn(Dispatchers.IO)
 
-    /**
-     * 分割されたパートファイルを結合して元のモデルファイルを復元する。
-     * 結合時に秘密鍵を要求するが、暗号化や復号化は行わない。
-     *
-     * @param inputFiles 結合対象のパートファイルのリスト
-     * @param outputFile 結合後のモデルファイル
-     * @return 結合進捗を表す Flow<Float>（0.0f ～ 1.0f）
-     */
     fun mergeModelFlow(
         inputFiles: List<File>,
         outputFile: File

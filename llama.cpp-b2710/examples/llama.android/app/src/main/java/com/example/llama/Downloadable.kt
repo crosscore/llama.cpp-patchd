@@ -53,9 +53,9 @@ data class Downloadable(
 
             val coroutineScope = rememberCoroutineScope()
 
-            // ViewModelのロード状態を取得
             val isLoading = viewModel.isLoading
             val loadingModelName = viewModel.loadingModelName
+            val loadingProgress = viewModel.loadingProgress
 
             suspend fun monitorDownload(downloadId: Long): State {
                 while (true) {
@@ -149,7 +149,9 @@ data class Downloadable(
                 enabled = (status !is Downloading) && (loadingModelName == null || loadingModelName == item.name)
             ) {
                 when {
-                    // ロード中の場合の表示
+                    isLoading && loadingModelName == item.name && loadingProgress != null -> {
+                        Text("Loading... ${(loadingProgress * 100).toInt()}%")
+                    }
                     isLoading && loadingModelName == item.name -> {
                         Text("Loading...")
                     }
