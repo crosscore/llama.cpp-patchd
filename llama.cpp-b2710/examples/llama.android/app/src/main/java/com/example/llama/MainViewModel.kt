@@ -1,12 +1,9 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainViewModel.kt
 package com.example.llama
 
+import android.content.Context
 import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
@@ -15,11 +12,13 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 
-class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
+class MainViewModel(
+    private val context: Context,
+    private val llm: Llm = Llm.instance()
+) : ViewModel() {
 
     private val tag: String? = this::class.simpleName
 
-    // ユーザーとLLMのメッセージのペアを保持
     var messages by mutableStateOf(listOf<Pair<String, String>>())
         private set
 
@@ -47,7 +46,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
     var numThreads by mutableIntStateOf(4)
         private set
 
-    // モデルのロード状態を公開
+    // Model loading state
     var isLoading by mutableStateOf(false)
         private set
 
@@ -56,10 +55,12 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
 
     val encryptionProgress = mutableStateMapOf<String, Float>()
     val decryptionProgress = mutableStateMapOf<String, Float>()
+    val splitProgress = mutableStateMapOf<String, Float>()
+    val mergeProgress = mutableStateMapOf<String, Float>()
 
     private var sendJob: Job? = null
 
-    // モデル操作完了時のコールバック
+    // Callback for when model operations complete
     var onModelOperationCompleted: (() -> Unit)? = null
 
     override fun onCleared() {
@@ -151,7 +152,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
             try {
                 val inputFile: File = model.file
 
-                // 既存の暗号化ファイルが存在する場合、ユニークな名前を生成
+                // Generate a unique name for the encrypted file
                 val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
                 val uniqueEncryptedFile = generateUniqueEncryptedFile(directory, inputFile.name)
 
@@ -177,7 +178,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 encryptionProgress.remove(model.name)
                 log("Model encrypted: ${uniqueEncryptedFile.absolutePath}")
 
-                // モデルリストを更新するためにコールバックを呼び出す
+                // Invoke callback to update model list
                 onModelOperationCompleted?.invoke()
             } catch (e: Exception) {
                 encryptionProgress.remove(model.name)
@@ -187,9 +188,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 
-    // ユニークな暗号化ファイル名を生成するヘルパー関数
     private fun generateUniqueEncryptedFile(directory: File, originalName: String): File {
-        // 既に .enc 拡張子が付いている場合はベースネームから .enc を削除
         val baseName = if (originalName.endsWith(".enc")) {
             originalName.removeSuffix(".enc")
         } else {
@@ -210,15 +209,15 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 val inputFile: File = model.file
                 val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
 
-                // ファイル名と拡張子を分離
+                // Separate filename and extension
                 val file = File(nameWithoutEncExtension)
                 val baseName = file.nameWithoutExtension
                 val extension = if (file.extension.isNotEmpty()) ".${file.extension}" else ""
 
-                // 既存の復号化ファイルが存在する場合、ユニークな名前を生成
+                // Generate a unique name for the decrypted file
                 val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
                 val decryptedFile = generateUniqueDecryptedFile(directory, baseName, extension)
-                val totalSize = inputFile.length() - 16 // IVサイズを除く
+                val totalSize = inputFile.length() - 16 // Exclude IV size
 
                 decryptionProgress[model.name] = 0f
                 var lastLoggedPercent = 0
@@ -241,7 +240,7 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
                 decryptionProgress.remove(model.name)
                 log("Model decrypted: ${decryptedFile.absolutePath}")
 
-                // モデルリストを更新するためにコールバックを呼び出す
+                // Invoke callback to update model list
                 onModelOperationCompleted?.invoke()
             } catch (e: Exception) {
                 decryptionProgress.remove(model.name)
@@ -256,6 +255,95 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         var newFile = File(directory, "$baseName$extension")
         while (newFile.exists()) {
             newFile = File(directory, "${baseName}_$index$extension")
+            index++
+        }
+        return newFile
+    }
+
+    fun splitModel(model: Downloadable, partSize: Long) {
+        viewModelScope.launch {
+            try {
+                val inputFile: File = model.file
+                val outputDir = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
+
+                splitProgress[model.name] = 0f
+                var lastLoggedPercent = 0
+
+                val splitter = ModelSplitter(context)
+
+                splitter.splitModelFlow(
+                    inputFile = inputFile,
+                    outputDir = outputDir,
+                    partSizeBytes = partSize
+                ).collect { progress ->
+                    splitProgress[model.name] = progress
+
+                    val currentPercent = (progress * 100).toInt()
+                    if (currentPercent > lastLoggedPercent) {
+                        lastLoggedPercent = currentPercent
+                        Log.d("SplitProgress", "Progress for ${model.name}: ${currentPercent}%")
+                    }
+                }
+                splitProgress.remove(model.name)
+                log("Model split completed: ${model.name}")
+
+                onModelOperationCompleted?.invoke()
+            } catch (e: Exception) {
+                splitProgress.remove(model.name)
+                log("Split failed: ${e.message}")
+                Log.e("SplitError", "Error during splitting", e)
+            }
+        }
+    }
+
+    fun mergeModel(parts: List<Downloadable>) {
+        viewModelScope.launch {
+            try {
+                if (parts.isEmpty()) {
+                    log("No parts selected for merging.")
+                    return@launch
+                }
+
+                val outputDir = parts.first().file.parentFile ?: throw IllegalStateException("Parent directory is null")
+                val baseName = parts.first().file.name.substringBefore(".part")
+
+                val outputFile = generateUniqueMergedFile(outputDir, baseName)
+
+                mergeProgress[baseName] = 0f
+                var lastLoggedPercent = 0
+
+                val splitter = ModelSplitter(context)
+
+                splitter.mergeModelFlow(
+                    inputFiles = parts.map { it.file },
+                    outputFile = outputFile
+                ).collect { progress ->
+                    mergeProgress[baseName] = progress
+
+                    val currentPercent = (progress * 100).toInt()
+                    if (currentPercent > lastLoggedPercent) {
+                        lastLoggedPercent = currentPercent
+                        Log.d("MergeProgress", "Progress for $baseName: ${currentPercent}%")
+                    }
+                }
+                mergeProgress.remove(baseName)
+                log("Model merge completed: ${outputFile.absolutePath}")
+
+                onModelOperationCompleted?.invoke()
+            } catch (e: Exception) {
+                val modelName = parts.firstOrNull()?.name ?: "Unknown"
+                mergeProgress.remove(modelName)
+                log("Merge failed: ${e.message}")
+                Log.e("MergeError", "Error during merging", e)
+            }
+        }
+    }
+
+    private fun generateUniqueMergedFile(directory: File, baseName: String): File {
+        var index = 1
+        var newFile = File(directory, "$baseName.merged")
+        while (newFile.exists()) {
+            newFile = File(directory, "${baseName}_$index.merged")
             index++
         }
         return newFile
@@ -312,5 +400,3 @@ class MainViewModel(private val llm: Llm = Llm.instance()) : ViewModel() {
         }
     }
 }
-
-

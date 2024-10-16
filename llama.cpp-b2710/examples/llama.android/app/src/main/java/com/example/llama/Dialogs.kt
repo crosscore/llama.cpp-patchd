@@ -12,10 +12,106 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+
+@Composable
+fun SplitDialog(
+    onDismiss: () -> Unit,
+    models: List<Downloadable>,
+    onSplit: (Downloadable, Long) -> Unit,
+    viewModel: MainViewModel
+) {
+    var partSize by remember { mutableStateOf("524288000") } // Default 500MB
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select a model to split") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = partSize,
+                    onValueChange = { partSize = it },
+                    label = { Text("Part Size (bytes)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                models.forEach { model ->
+                    val progress = viewModel.splitProgress[model.name] ?: 0f
+                    val buttonText = if (progress > 0f && progress < 1f) {
+                        "${model.name} (${(progress * 100).toInt()}%)"
+                    } else {
+                        model.name
+                    }
+                    Button(
+                        onClick = { onSplit(model, partSize.toLongOrNull() ?: 52428800L) },
+                        enabled = progress == 0f || progress >= 1f,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(buttonText)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun MergeDialog(
+    onDismiss: () -> Unit,
+    models: List<Downloadable>,
+    onMerge: (List<Downloadable>) -> Unit,
+    viewModel: MainViewModel
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Select model parts to merge") },
+        text = {
+            Column {
+                models.filter { it.file.name.contains(".part") }
+                    .groupBy { it.file.name.substringBefore(".part") }
+                    .forEach { (modelName, parts) ->
+                        val progress = viewModel.mergeProgress[modelName] ?: 0f
+                        val buttonText = if (progress > 0f && progress < 1f) {
+                            "$modelName (${(progress * 100).toInt()}%)"
+                        } else {
+                            modelName
+                        }
+                        Button(
+                            onClick = { onMerge(parts) },
+                            enabled = progress == 0f || progress >= 1f,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(buttonText)
+                        }
+                    }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
 
 @Composable
 fun EncryptionDialog(

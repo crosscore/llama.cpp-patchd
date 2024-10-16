@@ -14,19 +14,33 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.getSystemService
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import com.example.llama.ui.theme.LlamaAndroidTheme
 import java.io.File
 
@@ -36,9 +50,11 @@ class MainActivity : ComponentActivity() {
     private val downloadManager by lazy { getSystemService<DownloadManager>()!! }
     private val clipboardManager by lazy { getSystemService<ClipboardManager>()!! }
 
-    private val viewModel: MainViewModel by viewModels()
+    private val viewModel: MainViewModel by viewModels {
+        MainViewModelFactory(applicationContext)
+    }
 
-    // モデルリストをステートとして保持
+    // Keep models as a mutable state list
     private val models = mutableStateListOf<Downloadable>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,13 +76,15 @@ class MainActivity : ComponentActivity() {
         )
         viewModel.log("Downloads directory: ${getExternalFilesDir(null)}")
 
-        // 初期モデルリストのロード
+        // Initial loading of models
         loadModels()
 
         setContent {
             var showEncryptionDialog by remember { mutableStateOf(false) }
             var showDecryptionDialog by remember { mutableStateOf(false) }
             var showModelDialog by remember { mutableStateOf(false) }
+            var showSplitDialog by remember { mutableStateOf(false) }
+            var showMergeDialog by remember { mutableStateOf(false) }
 
             LlamaAndroidTheme {
                 Surface(
@@ -83,13 +101,17 @@ class MainActivity : ComponentActivity() {
                         showDecryptionDialog = showDecryptionDialog,
                         onShowDecryptionDialog = { showDecryptionDialog = it },
                         showModelDialog = showModelDialog,
-                        onShowModelDialog = { showModelDialog = it }
+                        onShowModelDialog = { showModelDialog = it },
+                        showSplitDialog = showSplitDialog,
+                        onShowSplitDialog = { showSplitDialog = it },
+                        showMergeDialog = showMergeDialog,
+                        onShowMergeDialog = { showMergeDialog = it }
                     )
                 }
             }
         }
 
-        // ViewModelのモデルロード完了時にモデルリストを再読み込みするリスナーを設定
+        // Set a listener to reload models when an operation completes
         viewModel.onModelOperationCompleted = {
             loadModels()
         }
@@ -101,12 +123,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // モデルリストをロードまたはリロードする関数
+    // Function to load or reload the model list
     private fun loadModels() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
-            file.isFile && (file.extension == "gguf" || file.extension == "enc")
+            file.isFile && (file.extension == "gguf" || file.extension == "enc" || file.name.contains(".part") || file.extension == "merged")
         }?.map { file ->
             Downloadable(
                 file.name,
@@ -125,9 +147,22 @@ class MainActivity : ComponentActivity() {
             ),
         )
 
-        // モデルリストを更新
+        // Update the models list
         models.clear()
         models.addAll(initialModels + downloadedModels)
+    }
+}
+
+// Factory to provide Context to the ViewModel
+class MainViewModelFactory(
+    private val context: android.content.Context
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MainViewModel(context) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
 
@@ -142,7 +177,11 @@ fun MainCompose(
     showDecryptionDialog: Boolean,
     onShowDecryptionDialog: (Boolean) -> Unit,
     showModelDialog: Boolean,
-    onShowModelDialog: (Boolean) -> Unit
+    onShowModelDialog: (Boolean) -> Unit,
+    showSplitDialog: Boolean,
+    onShowSplitDialog: (Boolean) -> Unit,
+    showMergeDialog: Boolean,
+    onShowMergeDialog: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -273,6 +312,13 @@ fun MainCompose(
             ) {
                 Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
                 Button(onClick = { onShowDecryptionDialog(true) }) { Text("Decryption") }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(onClick = { onShowSplitDialog(true) }) { Text("Split") }
+                Button(onClick = { onShowMergeDialog(true) }) { Text("Merge") }
                 Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
             }
         }
@@ -306,6 +352,28 @@ fun MainCompose(
                 models = models,
                 viewModel = viewModel,
                 dm = dm
+            )
+        }
+
+        if (showSplitDialog) {
+            SplitDialog(
+                onDismiss = { onShowSplitDialog(false) },
+                models = models,
+                onSplit = { model, partSize ->
+                    viewModel.splitModel(model, partSize)
+                },
+                viewModel = viewModel
+            )
+        }
+
+        if (showMergeDialog) {
+            MergeDialog(
+                onDismiss = { onShowMergeDialog(false) },
+                models = models,
+                onMerge = { parts ->
+                    viewModel.mergeModel(parts)
+                },
+                viewModel = viewModel
             )
         }
     }
