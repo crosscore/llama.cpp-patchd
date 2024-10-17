@@ -292,7 +292,6 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        // ボタンを2つの行に分割
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp)

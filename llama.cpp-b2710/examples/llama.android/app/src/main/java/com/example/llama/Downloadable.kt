@@ -139,7 +139,6 @@ data class Downloadable(
                         initiateDownload()
                     }
                     is Downloading -> {
-                        // ダウンロード中は何もしない（キャンセルは別ボタン）
                     }
                 }
             }
@@ -183,8 +182,6 @@ data class Downloadable(
                     }
                 }
             }
-
-            // ダウンロード中の場合にキャンセルボタンを表示
             if (status is Downloading) {
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(onClick = {
@@ -195,7 +192,7 @@ data class Downloadable(
             }
         }
 
-        // SHA256チェックサムを検証する関数
+        // SHA256チェックサム検証
         private fun verifyFileSha256(file: File, expectedSha256: String): Boolean {
             return try {
                 val digest = MessageDigest.getInstance("SHA-256")

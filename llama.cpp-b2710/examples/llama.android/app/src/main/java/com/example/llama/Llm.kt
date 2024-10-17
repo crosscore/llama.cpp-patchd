@@ -85,7 +85,6 @@ class Llm {
                     totalSize = totalSize
                 )
 
-                // Collect decryption progress
                 decryptionFlow.collect { decryptionProgress ->
                     progress = decryptionProgress * 0.5f // Let's assume decryption is first 50%
                     emit(progress)
@@ -130,7 +129,6 @@ class Llm {
     suspend fun send(message: String, nLen: Int, seed: Int, n_ctx: Int, n_threads: Int): Flow<String> = flow {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
-                // 新しいコンテキストを作成
                 val context = new_context(state.model, seed, n_ctx, n_threads)
                 if (context == 0L) throw IllegalStateException("new_context() failed")
 
@@ -154,13 +152,12 @@ class Llm {
                     kv_cache_clear(context)
                     free_batch(batch)
                 } finally {
-                    // コンテキストを解放
                     free_context(context)
                 }
             }
             else -> {}
         }
-    }.flowOn(runLoop) // ここもflowOnを追加
+    }.flowOn(runLoop)
 
     suspend fun unload() {
         withContext(runLoop) {
@@ -171,7 +168,6 @@ class Llm {
     private fun unloadInternal() {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
-                // `batch` は各関数でローカルに解放されるため、ここでの解放は不要
                 free_context(state.context)
                 free_model(state.model)
                 state.tempFile?.delete()
@@ -199,7 +195,6 @@ class Llm {
             data class Loaded(val model: Long, val context: Long, val tempFile: File?) : State
         }
 
-        // Llmのインスタンスは1つだけ
         private val _instance: Llm = Llm()
         fun instance(): Llm = _instance
     }

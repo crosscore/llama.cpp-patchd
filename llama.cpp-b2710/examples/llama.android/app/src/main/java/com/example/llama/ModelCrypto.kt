@@ -23,7 +23,7 @@ class ModelCrypto {
         private const val TAG = "ModelCrypto"
     }
 
-    // 鍵を生成または取得。簡単のためにハードコードされた鍵を使用。
+    // 鍵を生成または取得。簡単のためにハードコードされた鍵を使用
     private fun getSecretKey(): SecretKey {
         // 注意: 以下の鍵は例示目的
         val keyBytes = ByteArray(KEY_SIZE) { 0x00 }
@@ -84,7 +84,7 @@ class ModelCrypto {
         totalSize: Long
     ): Flow<Float> = flow {
         try {
-            // IVを入力ストリームから読み取る
+            // IVをinputStreamから読み取る
             val iv = ByteArray(IV_SIZE)
             val ivBytesRead = inputStream.read(iv)
             if (ivBytesRead != IV_SIZE) {
