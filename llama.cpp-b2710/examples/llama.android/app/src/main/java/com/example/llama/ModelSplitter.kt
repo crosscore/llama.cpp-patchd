@@ -42,7 +42,6 @@ class ModelSplitter {
                             emit(progress)
                         }
                     }
-
                     partIndex++
                 }
             }

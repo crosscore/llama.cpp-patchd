@@ -192,7 +192,6 @@ data class Downloadable(
             }
         }
 
-        // SHA256チェックサム検証
         private fun verifyFileSha256(file: File, expectedSha256: String): Boolean {
             return try {
                 val digest = MessageDigest.getInstance("SHA-256")
