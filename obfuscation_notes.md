@@ -21,7 +21,7 @@
    │   └── dasho.gradle      # アプリケーションレベルのDashO設定
    ├── build.gradle.kts      # プロジェクトビルド設定
    ├── dasho.gradle          # プロジェクトレベルのDashO設定
-   ├── dasho.xml            # DashOのAntタスク設定
+   ├── dasho.xml             # DashOのAntタスク設定
    ├── gradle.properties
    ├── gradlew*
    └── settings.gradle.kts
