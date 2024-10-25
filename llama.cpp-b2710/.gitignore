@@ -34,7 +34,6 @@ ggml-metal-embed.metal
 lcov-report/
 gcovr-report/
 
-build*
 !build.zig
 cmake-build-*
 out/
