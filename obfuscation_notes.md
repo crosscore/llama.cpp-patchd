@@ -2,94 +2,126 @@
 
 ## 概要
 
-- **目的**: 有料版のDashOがインストールされているJenkins環境を利用して、Android Studioで作成したプロジェクトの難読化済みAPKを作成する。
+- **目的**: DashOを利用して、Android Studioで作成したプロジェクトの難読化済みAPKをJenkins環境で作成する。
 - **開発環境**: Android Studioで`llama.cpp-b2710/examples/llama.android`フォルダを開いて開発を行った。
-- **ソースコード**: gitリポジトリのブランチ"scrap/tsuzumi_dasho"にコミット済み
-- **プロジェクトパス**: `scrap/tsuzumi_dasho/stbdag_android/llama.cpp-b2710`
+- **ソースコード**: Gitリポジトリのブランチ`scrap/tsuzumi_dasho`にコミット済み
+- **プロジェクトパス**: `scrap/tsuzumi_dasho/llama.cpp-b2710`
 
-## ファイル構成と役割
+## 現在の状況
 
-1. **Androidプロジェクト基本ファイル**:
-   ```
-   llama.cpp-b2710/examples/llama.android/
-   ├── README.md
-   ├── gradle/
-   ├── local.properties      # SDKパス設定: ${HOME}/Library/Android/sdk
-   ├── app/
-   │   ├── build.gradle.kts  # アプリケーションビルド設定
-   │   ├── project.dox       # DashO詳細設定
-   │   └── dasho.gradle      # アプリケーションレベルのDashO設定
-   ├── build.gradle.kts      # プロジェクトビルド設定
-   ├── dasho.gradle          # プロジェクトレベルのDashO設定
-   ├── dasho.xml             # DashOのAntタスク設定
-   ├── gradle.properties
-   ├── gradlew*
-   └── settings.gradle.kts
-   ```
+### 確認済みの事項
 
-2. **DashO関連ファイル**:
-   - `project.dox`:
-     - パッケージ名、SDKバージョン等の基本設定
-     - 難読化除外設定（androidx, compose等）
-     - エントリーポイント設定（MainActivity, UI Components）
-     - 文字列暗号化、制御フロー難読化の設定
-   - `dasho.gradle`（プロジェクトルート）:
-     - DashOプラグイン設定
-     - バージョン: 1.4.0
-   - `dasho.gradle`（app/）:
-     - DashOタスク設定
-     - マッピングファイル出力設定
-   - `dasho.xml`:
-     - Antタスクの定義
-     - メモリ設定
-     - ビルドターゲット設定
+1. **プロジェクトの基本構成**
+   - Android Studio上でのビルドは成功
+   - Gradle 8.7を使用
+   - Android Gradle Plugin 8.6.1で動作確認済み
 
-3. **Jenkinsビルド設定**:
-   - Build Steps用Pythonスクリプト:
-     - プロジェクトパス: `llama.cpp-b2710/examples/llama.android`
-     - 出力APK名: `llama-release.apk`
-     - DashO結果: `dasho-result.tgz`
-   - 環境変数:
-     - `ANDROID_HOME`: Android SDKパス（Jenkins System設定で定義）
-     - Build Tools: 34.0.0を使用
+2. **DashOの設定ファイル**
+   - 現在、`dasho.xml`や`project.dox`などのDashO設定ファイルは、別のプロジェクトのものしか存在しない
+   - これらの設定ファイルは現在のプロジェクト用に作成または修正する必要がある
 
-## 設定詳細
+3. **他プロジェクトからの学び**
+   - 他のプロジェクトでは、DashOのプラグインがGradle経由で管理されており、インストールパスの指定が不要であることを確認
+   - DashOの設定ファイルやビルドスクリプトの構成が参考になる
 
-1. **難読化設定**:
-   - クラス名とメンバー名のランダム化
-   - 文字列暗号化（レベル1）
-   - 制御フロー難読化
-   - デバッグ情報の削除
+### 未解決の課題
 
-2. **エントリーポイント**:
-   - `com.example.llama.MainActivity`
-   - Compose UI関連のパブリックコンストラクタ
+1. **DashO設定ファイルの作成**
+   - `dasho.xml`、`project.dox`を現在のプロジェクトに適合するように新規作成または修正する必要がある
+   - パッケージ名、クラスパス、エントリポイント、除外リストなどを現在のプロジェクトに合わせて設定する必要がある
 
-3. **除外設定**:
-   - `android.**`
-   - `androidx.**`
-   - `com.google.**`
-   - `androidx.compose.**`
+2. **Gradleビルドの設定**
+   - プロジェクトの`build.gradle`ファイルにDashOプラグインと必要な設定を正しく追加する必要がある
+   - DashO設定ファイルのパスや内容をプロジェクト構成に合わせて指定する必要がある
 
-## ビルドプロセス
+3. **ビルドスクリプトの作成**
+   - Jenkinsで実行するビルドスクリプトを、他のプロジェクトを参考にしつつ、現在のプロジェクト用に作成する必要がある
+   - プロジェクト名やパス、ビルドターゲットなどを現在のプロジェクトに合わせて調整する必要がある
 
-1. **準備**:
-   - gitリポジトリから最新コードをチェックアウト
-   - gradlewに実行権限付与
-   - 既存のAPKファイルを削除
+## 次のステップ
 
-2. **ビルド実行**:
-   - クリーンビルド: `./gradlew clean`
-   - リリースビルド: `./gradlew assembleRelease`
-   - zipalign処理
-   - 成果物の移動
+1. **DashO設定ファイルの作成または修正**
 
-3. **成果物**:
-   - 難読化済みAPK: `llama-release.apk`
-   - DashO処理結果: `dasho-result.tgz`
+   - **`dasho.xml`の作成**
+     - 他のプロジェクトの`dasho.xml`を参考に、現在のプロジェクトに適した設定を記述する
+     - パスやプロパティ、ターゲット、エントリポイントなどを現在のプロジェクトに合わせる
 
-## 今後の課題
+   - **`project.dox`の作成**
+     - 難読化の詳細な設定を現在のプロジェクトに合わせて記述する
+     - 入力パス、クラスパス、エントリポイント、リネーミングオプションなどを設定
 
-1. ビルド実行による動作確認
-2. 難読化の効果確認
-3. 必要に応じた設定の調整
+   - **注意点**
+     - **パッケージ名やクラス名**: 現在のプロジェクトのものを正確に指定する
+     - **クラスパスの設定**: プロジェクトの依存関係やライブラリを正しく含める
+     - **エントリポイントの指定**: アプリのメインアクティビティやサービスなど、難読化から除外すべきクラスやメソッドを指定
+
+2. **Gradle設定の更新**
+
+   - **プロジェクトレベルの`build.gradle`に以下を追加**
+
+     ```groovy
+     buildscript {
+         repositories {
+             maven {
+                 url 'https://maven.preemptive.com'
+             }
+         }
+         dependencies {
+             classpath 'com.preemptive.dasho:dasho-android:1.3.+'
+         }
+     }
+     ```
+
+   - **モジュールレベルの`build.gradle`に以下を追加**
+
+     ```groovy
+     apply plugin: 'com.preemptive.dasho.android'
+
+     dasho {
+         searchVersion "11.2"
+         // 必要な設定を追加
+         doxFilename "project.dox"
+     }
+     ```
+
+3. **ビルドスクリプトの作成**
+
+   - **他のプロジェクトのビルドスクリプトを参考にする**
+     - ビルドスクリプトの構成や処理内容を理解する
+     - DashO設定ファイルのコピー、ビルドコマンドの実行、APKの署名などの処理を確認
+
+   - **現在のプロジェクトに合わせて修正**
+     - プロジェクト名 (`PROJECT_NAME`) やビルドターゲット (`BUILD_TARGET`) を現在のプロジェクトに合わせる
+     - DashO設定ファイルのコピー元・コピー先のパスを修正
+     - APKの出力パスやファイル名を現在のプロジェクトに合わせる
+
+4. **環境変数の確認**
+
+   - **Jenkins環境で必要な環境変数が設定されているか確認**
+     - DashOのライセンスキーなど、ビルド時に必要な環境変数が設定されているか確認する
+     - 必要であれば、Jenkinsの設定で環境変数を追加
+
+5. **ビルドの実行と検証**
+
+   - **Jenkins上でビルドを実行**
+     - ビルドが成功し、難読化されたAPKが生成されるか確認
+
+   - **エラーが発生した場合の対応**
+     - エラーログを確認し、設定ファイルやビルドスクリプトを修正
+     - パスの誤りや設定の不足などを特定し、修正する
+
+6. **ドキュメントの更新**
+
+   - **設定ファイルやビルド手順をドキュメント化**
+     - 今後の開発者が理解しやすいように、設定内容やビルド手順をまとめる
+
+---
+
+**補足:**
+
+- **DashO設定ファイルの作成にあたって**
+  - 他のプロジェクトの設定をそのまま使うのではなく、現在のプロジェクトの構成に合わせて一から設定する必要があります
+  - DashOの公式ドキュメントを参照し、設定項目を理解した上で作成してください
+
+- **ツールのバージョン互換性**
+  - 使用しているGradle、Android Gradle Plugin、DashOのバージョンが互換性を持つように確認してください

@@ -1,3 +1,5 @@
+// llama.cpp-b2710/examples/llama.android/settings.gradle.kts
+
 pluginManagement {
     repositories {
         google()
