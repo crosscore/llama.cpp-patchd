@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.llama"
-        minSdk = 33
+        minSdk = 28
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -64,7 +64,7 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+            // version = "3.22.1"
         }
     }
 }
