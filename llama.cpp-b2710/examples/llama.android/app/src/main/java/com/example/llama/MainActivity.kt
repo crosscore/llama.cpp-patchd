@@ -80,11 +80,7 @@ class MainActivity : ComponentActivity() {
         loadModels()
 
         setContent {
-            var showEncryptionDialog by remember { mutableStateOf(false) }
-            var showDecryptionDialog by remember { mutableStateOf(false) }
             var showModelDialog by remember { mutableStateOf(false) }
-            var showSplitDialog by remember { mutableStateOf(false) }
-            var showMergeDialog by remember { mutableStateOf(false) }
 
             LlamaAndroidTheme {
                 Surface(
@@ -96,16 +92,8 @@ class MainActivity : ComponentActivity() {
                         clipboard = clipboardManager,
                         dm = downloadManager,
                         models = models,
-                        showEncryptionDialog = showEncryptionDialog,
-                        onShowEncryptionDialog = { showEncryptionDialog = it },
-                        showDecryptionDialog = showDecryptionDialog,
-                        onShowDecryptionDialog = { showDecryptionDialog = it },
                         showModelDialog = showModelDialog,
-                        onShowModelDialog = { showModelDialog = it },
-                        showSplitDialog = showSplitDialog,
-                        onShowSplitDialog = { showSplitDialog = it },
-                        showMergeDialog = showMergeDialog,
-                        onShowMergeDialog = { showMergeDialog = it }
+                        onShowModelDialog = { showModelDialog = it }
                     )
                 }
             }
@@ -128,7 +116,7 @@ class MainActivity : ComponentActivity() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
-            file.isFile && (file.extension == "gguf" || file.extension == "enc" || file.name.contains(".part") || file.extension == "merged")
+            file.isFile && file.extension == "gguf"
         }?.map { file ->
             Downloadable(
                 file.name,
@@ -170,16 +158,8 @@ fun MainCompose(
     clipboard: ClipboardManager,
     dm: DownloadManager,
     models: List<Downloadable>,
-    showEncryptionDialog: Boolean,
-    onShowEncryptionDialog: (Boolean) -> Unit,
-    showDecryptionDialog: Boolean,
-    onShowDecryptionDialog: (Boolean) -> Unit,
     showModelDialog: Boolean,
-    onShowModelDialog: (Boolean) -> Unit,
-    showSplitDialog: Boolean,
-    onShowSplitDialog: (Boolean) -> Unit,
-    showMergeDialog: Boolean,
-    onShowMergeDialog: (Boolean) -> Unit
+    onShowModelDialog: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
 
@@ -292,85 +272,22 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
-                Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = { onShowEncryptionDialog(true) }) { Text("Encryption") }
-                Button(onClick = { onShowDecryptionDialog(true) }) { Text("Decryption") }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(onClick = { onShowSplitDialog(true) }) { Text("Split") }
-                Button(onClick = { onShowMergeDialog(true) }) { Text("Merge") }
-                Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
-            }
+            Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
+            Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
+            Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
         }
 
-        // ダイアログの表示
-        if (showEncryptionDialog) {
-            EncryptionDialog(
-                onDismiss = { onShowEncryptionDialog(false) },
-                models = models,
-                onEncrypt = { model ->
-                    viewModel.encryptModel(model)
-                },
-                viewModel = viewModel
-            )
-        }
-
-        if (showDecryptionDialog) {
-            DecryptionDialog(
-                onDismiss = { onShowDecryptionDialog(false) },
-                models = models,
-                onDecrypt = { model ->
-                    viewModel.decryptModel(model)
-                },
-                viewModel = viewModel
-            )
-        }
-
+        // Model Selection Dialog
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
                 models = models,
                 viewModel = viewModel,
                 dm = dm
-            )
-        }
-
-        if (showSplitDialog) {
-            SplitDialog(
-                onDismiss = { onShowSplitDialog(false) },
-                models = models,
-                onSplit = { model, partSize ->
-                    viewModel.splitModel(model, partSize)
-                },
-                viewModel = viewModel
-            )
-        }
-
-        if (showMergeDialog) {
-            MergeDialog(
-                onDismiss = { onShowMergeDialog(false) },
-                models = models,
-                onMerge = { parts, secretKey ->
-                    viewModel.mergeModel(parts, secretKey)
-                },
-                viewModel = viewModel
             )
         }
     }
