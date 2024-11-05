@@ -7,9 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 
 class MainViewModel(
     private val llm: Llm = Llm.instance()
@@ -53,11 +50,6 @@ class MainViewModel(
 
     var loadingProgress by mutableStateOf<Float?>(null)
         private set
-
-    val encryptionProgress = mutableStateMapOf<String, Float>()
-    val decryptionProgress = mutableStateMapOf<String, Float>()
-    val splitProgress = mutableStateMapOf<String, Float>()
-    val mergeProgress = mutableStateMapOf<String, Float>()
 
     private var sendJob: Job? = null
 
@@ -148,217 +140,6 @@ class MainViewModel(
         }
     }
 
-    fun encryptModel(model: Downloadable) {
-        viewModelScope.launch {
-            try {
-                val inputFile: File = model.file
-
-                // Generate a unique name for the encrypted file
-                val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
-                val uniqueEncryptedFile = generateUniqueEncryptedFile(directory, inputFile.name)
-
-                val totalSize = inputFile.length()
-                encryptionProgress[model.name] = 0f
-                var lastLoggedPercent = 0
-
-                ModelCrypto().encryptModelFlow(
-                    inputStream = FileInputStream(inputFile),
-                    outputStream = FileOutputStream(uniqueEncryptedFile),
-                    totalSize = totalSize
-                )
-                    .flowOn(Dispatchers.IO)
-                    .collect { progress ->
-                        encryptionProgress[model.name] = progress
-
-                        val currentPercent = (progress * 100).toInt()
-                        if (currentPercent > lastLoggedPercent) {
-                            lastLoggedPercent = currentPercent
-                            Log.d("EncryptionProgress", "Progress for ${model.name}: ${currentPercent}%")
-                        }
-                    }
-                encryptionProgress.remove(model.name)
-                log("Model encrypted: ${uniqueEncryptedFile.absolutePath}")
-
-                // Invoke callback to update model list
-                onModelOperationCompleted?.invoke()
-            } catch (e: Exception) {
-                encryptionProgress.remove(model.name)
-                log("Encryption failed: ${e.message}")
-                Log.e("EncryptionError", "Error during encryption", e)
-            }
-        }
-    }
-
-    private fun generateUniqueEncryptedFile(directory: File, originalName: String): File {
-        val baseName = if (originalName.endsWith(".enc")) {
-            originalName.removeSuffix(".enc")
-        } else {
-            originalName
-        }
-        var index = 1
-        var newFile = File(directory, "$baseName.enc")
-        while (newFile.exists()) {
-            newFile = File(directory, "${baseName}_$index.enc")
-            index++
-        }
-        return newFile
-    }
-
-    fun decryptModel(model: Downloadable) {
-        viewModelScope.launch {
-            try {
-                val inputFile: File = model.file
-                val nameWithoutEncExtension = inputFile.name.removeSuffix(".enc")
-
-                // Separate filename and extension
-                val file = File(nameWithoutEncExtension)
-                val baseName = file.nameWithoutExtension
-                val extension = if (file.extension.isNotEmpty()) ".${file.extension}" else ""
-
-                // Generate a unique name for the decrypted file
-                val directory = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
-                val decryptedFile = generateUniqueDecryptedFile(directory, baseName, extension)
-                val totalSize = inputFile.length() - 16 // Exclude IV size
-
-                decryptionProgress[model.name] = 0f
-                var lastLoggedPercent = 0
-
-                ModelCrypto().decryptModelFlow(
-                    inputStream = FileInputStream(inputFile),
-                    outputStream = FileOutputStream(decryptedFile),
-                    totalSize = totalSize
-                )
-                    .flowOn(Dispatchers.IO)
-                    .collect { progress ->
-                        decryptionProgress[model.name] = progress
-
-                        val currentPercent = (progress * 100).toInt()
-                        if (currentPercent > lastLoggedPercent) {
-                            lastLoggedPercent = currentPercent
-                            Log.d("DecryptionProgress", "Progress for ${model.name}: ${currentPercent}%")
-                        }
-                    }
-                decryptionProgress.remove(model.name)
-                log("Model decrypted: ${decryptedFile.absolutePath}")
-
-                // Invoke callback to update model list
-                onModelOperationCompleted?.invoke()
-            } catch (e: Exception) {
-                decryptionProgress.remove(model.name)
-                log("Decryption failed: ${e.message}")
-                Log.e("DecryptionError", "Error during decryption", e)
-            }
-        }
-    }
-
-    private fun generateUniqueDecryptedFile(directory: File, baseName: String, extension: String): File {
-        var index = 1
-        var newFile = File(directory, "$baseName$extension")
-        while (newFile.exists()) {
-            newFile = File(directory, "${baseName}_$index$extension")
-            index++
-        }
-        return newFile
-    }
-
-    fun splitModel(model: Downloadable, partSize: Long) {
-        viewModelScope.launch {
-            try {
-                val inputFile: File = model.file
-                val outputDir = inputFile.parentFile ?: throw IllegalStateException("Parent directory is null")
-
-                splitProgress[model.name] = 0f
-                var lastLoggedPercent = 0
-
-                val splitter = ModelSplitter()
-
-                splitter.splitModelFlow(
-                    inputFile = inputFile,
-                    outputDir = outputDir,
-                    partSizeBytes = partSize
-                ).collect { progress ->
-                    splitProgress[model.name] = progress
-
-                    val currentPercent = (progress * 100).toInt()
-                    if (currentPercent > lastLoggedPercent) {
-                        lastLoggedPercent = currentPercent
-                        Log.d("SplitProgress", "Progress for ${model.name}: ${currentPercent}%")
-                    }
-                }
-                splitProgress.remove(model.name)
-                log("Model split completed: ${model.name}")
-
-                onModelOperationCompleted?.invoke()
-            } catch (e: Exception) {
-                splitProgress.remove(model.name)
-                log("Split failed: ${e.message}")
-                Log.e("SplitError", "Error during splitting", e)
-            }
-        }
-    }
-
-    fun mergeModel(parts: List<Downloadable>, secretKey: String) {
-        viewModelScope.launch {
-            // 秘密鍵をチェック（例としてハードコードされた鍵を使用）
-            if (secretKey != "42") {
-                log("Invalid secret key provided.")
-                return@launch
-            }
-
-            try {
-                if (parts.isEmpty()) {
-                    log("No parts selected for merging.")
-                    return@launch
-                }
-
-                val outputDir = parts.first().file.parentFile ?: throw IllegalStateException("Parent directory is null")
-                val baseNameWithExtension = parts.first().file.name.substringBefore(".part")
-                val file = File(baseNameWithExtension)
-                val baseName = file.nameWithoutExtension
-                val extension = if (file.extension.isNotEmpty()) ".${file.extension}" else ""
-
-                val outputFile = generateUniqueMergedFile(outputDir, baseName, extension)
-
-                mergeProgress[baseNameWithExtension] = 0f
-                var lastLoggedPercent = 0
-
-                val splitter = ModelSplitter()
-
-                splitter.mergeModelFlow(
-                    inputFiles = parts.map { it.file },
-                    outputFile = outputFile
-                ).collect { progress ->
-                    mergeProgress[baseNameWithExtension] = progress
-
-                    val currentPercent = (progress * 100).toInt()
-                    if (currentPercent > lastLoggedPercent) {
-                        lastLoggedPercent = currentPercent
-                        Log.d("MergeProgress", "Progress for $baseNameWithExtension: ${currentPercent}%")
-                    }
-                }
-                mergeProgress.remove(baseNameWithExtension)
-                log("Model merge completed: ${outputFile.absolutePath}")
-
-                onModelOperationCompleted?.invoke()
-            } catch (e: Exception) {
-                val modelName = parts.firstOrNull()?.name?.substringBefore(".part") ?: "Unknown"
-                mergeProgress.remove(modelName)
-                log("Merge failed: ${e.message}")
-                Log.e("MergeError", "Error during merging", e)
-            }
-        }
-    }
-
-    private fun generateUniqueMergedFile(directory: File, baseName: String, extension: String): File {
-        var index = 1
-        var newFile = File(directory, "$baseName$extension")
-        while (newFile.exists()) {
-            newFile = File(directory, "${baseName}_$index$extension")
-            index++
-        }
-        return newFile
-    }
-
     fun load(pathToModel: String) {
         if (isLoading) {
             log("Model is already loading. Please wait.")
@@ -366,7 +147,7 @@ class MainViewModel(
         }
 
         isLoading = true
-        loadingModelName = File(pathToModel).name
+        loadingModelName = pathToModel.split("/").last()
         loadingProgress = 0f
 
         viewModelScope.launch {
