@@ -6,9 +6,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.util.concurrent.Executors
 import kotlin.concurrent.thread
 
@@ -69,60 +66,24 @@ class Llm {
 
     fun load(pathToModel: String, seed: Int, n_ctx: Int, n_threads: Int): Flow<Float> = flow {
         unloadInternal()
-        var progress = 0f
-        emit(progress)
+        emit(0f)
 
-        val actualPath: String
-        val tempFile: File?
-
-        if (pathToModel.endsWith(".enc")) {
-            tempFile = File.createTempFile("model", ".gguf")
-            try {
-                val totalSize = File(pathToModel).length()
-                val decryptionFlow = ModelCrypto().decryptModelFlow(
-                    inputStream = FileInputStream(pathToModel),
-                    outputStream = FileOutputStream(tempFile),
-                    totalSize = totalSize
-                )
-
-                decryptionFlow.collect { decryptionProgress ->
-                    progress = decryptionProgress * 0.5f // Let's assume decryption is first 50%
-                    emit(progress)
-                }
-
-                actualPath = tempFile.absolutePath
-            } catch (e: Exception) {
-                tempFile.delete()
-                throw IllegalStateException("Failed to decrypt model: ${e.message}")
-            }
-        } else {
-            actualPath = pathToModel
-            tempFile = null
-        }
-
-        // Now loading model
-        progress = 0.5f
-        emit(progress)
-        val model = load_model(actualPath)
+        val model = load_model(pathToModel)
         if (model == 0L) {
-            tempFile?.delete()
             throw IllegalStateException("load_model() failed")
         }
-        progress = 0.75f
-        emit(progress)
+        emit(0.5f)
 
         val context = new_context(model, seed, n_ctx, n_threads)
         if (context == 0L) {
             free_model(model)
-            tempFile?.delete()
             throw IllegalStateException("new_context() failed")
         }
 
-        progress = 1f
-        emit(progress)
-        Log.i(tag, "Loaded model $actualPath")
-        threadLocalState.set(State.Loaded(model, context, tempFile))
-    }.flowOn(runLoop) // Flow全体の実行コンテキストを変更
+        emit(1f)
+        Log.i(tag, "Loaded model $pathToModel")
+        threadLocalState.set(State.Loaded(model, context))
+    }.flowOn(runLoop)
 
     class MaxTokensReachedException : Exception("Max tokens limit reached")
 
@@ -170,7 +131,6 @@ class Llm {
             is State.Loaded -> {
                 free_context(state.context)
                 free_model(state.model)
-                state.tempFile?.delete()
                 threadLocalState.set(State.Idle)
             }
             else -> {}
@@ -192,7 +152,7 @@ class Llm {
 
         private sealed interface State {
             data object Idle : State
-            data class Loaded(val model: Long, val context: Long, val tempFile: File?) : State
+            data class Loaded(val model: Long, val context: Long) : State
         }
 
         private val _instance: Llm = Llm()
