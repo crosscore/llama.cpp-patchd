@@ -170,7 +170,6 @@ fun MainCompose(
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        // メモリ情報とモデルパスの表示をまとめて枠線付きで表示
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -281,6 +280,13 @@ fun MainCompose(
             Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
         }
 
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(onClick = { viewModel.toggleSystemPromptDialog() }) { Text("System Prompt") }
+        }
+
         // Model Selection Dialog
         if (showModelDialog) {
             ModelDialog(
@@ -288,6 +294,15 @@ fun MainCompose(
                 models = models,
                 viewModel = viewModel,
                 dm = dm
+            )
+        }
+
+        // System Prompt Dialog
+        if (viewModel.showSystemPromptDialog) {
+            SystemPromptDialog(
+                onDismiss = { viewModel.toggleSystemPromptDialog() },
+                currentPrompt = viewModel.systemPrompt,
+                onUpdatePrompt = { viewModel.updateSystemPrompt(it) }
             )
         }
     }

@@ -29,13 +29,13 @@ class MainViewModel(
     var currentModelPath: String? by mutableStateOf(null)
         private set
 
-    var maxTokens by mutableIntStateOf(32)
+    var maxTokens by mutableIntStateOf(256)
         private set
 
     var seed by mutableIntStateOf(42)
         private set
 
-    var contextSize by mutableIntStateOf(512)
+    var contextSize by mutableIntStateOf(1024)
         private set
 
     var numThreads by mutableIntStateOf(4)
@@ -69,7 +69,7 @@ class MainViewModel(
     }
 
     fun updateMaxTokens(newMaxTokens: String) {
-        maxTokens = newMaxTokens.toIntOrNull() ?: 32
+        maxTokens = newMaxTokens.toIntOrNull() ?: 256
     }
 
     fun updateSeed(newSeed: String) {
@@ -77,11 +77,28 @@ class MainViewModel(
     }
 
     fun updateContextSize(newContextSize: String) {
-        contextSize = newContextSize.toIntOrNull() ?: 512
+        contextSize = newContextSize.toIntOrNull() ?: 1024
     }
 
     fun updateNumThreads(newNumThreads: String) {
         numThreads = newNumThreads.toIntOrNull() ?: 4
+    }
+
+    // For SystemPrompt
+    var systemPrompt by mutableStateOf(
+        """あなたはUserからの質問に日本語で簡潔に回答するAIアシスタントです。""".trimMargin()
+    )
+        private set
+
+    var showSystemPromptDialog by mutableStateOf(false)
+        private set
+
+    fun updateSystemPrompt(newPrompt: String) {
+        systemPrompt = newPrompt
+    }
+
+    fun toggleSystemPromptDialog() {
+        showSystemPromptDialog = !showSystemPromptDialog
     }
 
     fun send() {
@@ -89,13 +106,20 @@ class MainViewModel(
         if (text.isEmpty()) return
         message = ""
 
+        val formattedPrompt = buildString {
+            appendLine("System:$systemPrompt")
+            appendLine("User:$text")
+            append("Assistant:")
+        }
+
+        Log.d(tag, "Sending prompt: $formattedPrompt")
         messages = messages + Pair(text, "")
         val currentIndex = messages.lastIndex
 
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
             try {
-                llm.send(text, maxTokens, seed, contextSize, numThreads)
+                llm.send(formattedPrompt, maxTokens, seed, contextSize, numThreads)
                     .onCompletion { cause ->
                         if (cause == null) {
                             responseBuilder.append("[Output Completed]")

@@ -224,7 +224,14 @@ Java_com_example_llama_Llm_completion_1init(
     auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
     auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
 
+    LOGi("Input text for tokenization: %s", text);
+
     const auto tokens_list = llama_tokenize(context, text, true);
+    // DEBUG：トークン化結果の出力
+    LOGi("Tokenized length: %zu", tokens_list.size());
+    for (auto id: tokens_list) {
+        LOGi("Token: %s (id: %d)", llama_token_to_piece(context, id).c_str(), id);
+    }
 
     auto n_ctx = llama_n_ctx(context);
     auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
