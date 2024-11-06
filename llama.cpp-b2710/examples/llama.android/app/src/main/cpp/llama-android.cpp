@@ -217,33 +217,137 @@ Java_com_example_llama_Llm_completion_1init(
         jstring jtext,
         jint n_len
 ) {
-
     cached_token_chars.clear();
 
     const auto *const text = env->GetStringUTFChars(jtext, nullptr);
-    auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
-    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer);
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
+    auto *const model = llama_get_model(context);
 
-    LOGi("Input text for tokenization: %s", text);
+    LOGi("=== Input Analysis ===");
+    LOGi("Raw input text: %s", text);
 
     const auto tokens_list = llama_tokenize(context, text, true);
-    // DEBUG：トークン化結果の出力
-    LOGi("Tokenized length: %zu", tokens_list.size());
+
+    LOGi("=== Detailed Token Analysis ===");
+    LOGi("Total tokens: %zu", tokens_list.size());
+
+    // 特殊トークンの取得
+    const llama_token bos_token = llama_token_bos(model);
+    const llama_token eos_token = llama_token_eos(model);
+    const llama_token nl_token = llama_token_nl(model);
+    const llama_token cls_token = llama_token_cls(model);
+    const llama_token sep_token = llama_token_sep(model);
+
+    LOGi("Special tokens:");
+    LOGi("- BOS token: %d", bos_token);
+    LOGi("- EOS token: %d", eos_token);
+    LOGi("- Newline token: %d", nl_token);
+    LOGi("- CLS token: %d", cls_token);
+    LOGi("- SEP token: %d", sep_token);
+
+    // トークンの詳細情報を出力
+    char piece_buf[128];
     for (auto id: tokens_list) {
-        LOGi("Token: %s (id: %d)", llama_token_to_piece(context, id).c_str(), id);
+        // トークンをテキストに変換
+        int32_t piece_len = llama_token_to_piece(model, id, piece_buf, sizeof(piece_buf), true);
+        if (piece_len < 0) {
+            LOGe("Failed to convert token to piece");
+            continue;
+        }
+        std::string token_text(piece_buf, piece_len);
+
+        // 制御文字やスペースの可視化
+        std::string visible_text = token_text;
+        for (size_t i = 0; i < visible_text.length(); i++) {
+            char c = visible_text[i];
+            if (c == '\n') {
+                visible_text.replace(i, 1, "\\n");
+                i++;
+            } else if (c == '\r') {
+                visible_text.replace(i, 1, "\\r");
+                i++;
+            } else if (c == '\t') {
+                visible_text.replace(i, 1, "\\t");
+                i++;
+            } else if (c == ' ') {
+                visible_text.replace(i, 1, "␣");
+            }
+        }
+
+        // バイト表現の取得
+        std::string bytes;
+        for (char c : token_text) {
+            char hex[8];
+            snprintf(hex, sizeof(hex), "\\x%02X", static_cast<unsigned char>(c));
+            bytes += hex;
+        }
+
+        // トークンタイプの取得
+        llama_token_type token_type = llama_token_get_type(model, id);
+        const char* type_str;
+        switch (token_type) {
+            case LLAMA_TOKEN_TYPE_UNDEFINED:    type_str = "UNDEFINED"; break;
+            case LLAMA_TOKEN_TYPE_NORMAL:       type_str = "NORMAL"; break;
+            case LLAMA_TOKEN_TYPE_UNKNOWN:      type_str = "UNKNOWN"; break;
+            case LLAMA_TOKEN_TYPE_CONTROL:      type_str = "CONTROL"; break;
+            case LLAMA_TOKEN_TYPE_USER_DEFINED: type_str = "USER_DEFINED"; break;
+            case LLAMA_TOKEN_TYPE_UNUSED:       type_str = "UNUSED"; break;
+            case LLAMA_TOKEN_TYPE_BYTE:         type_str = "BYTE"; break;
+            default:                            type_str = "???"; break;
+        }
+
+        // 特殊トークンのチェック
+        bool is_eog = llama_token_is_eog(model, id);
+
+        float token_score = llama_token_get_score(model, id);
+
+        // トークン情報の出力
+        LOGi("Token[%5d] | Type: %-11s | Score: %8.3f | Raw: '%-20s' | Bytes: %-30s | Visible: '%-20s' %s",
+             id,
+             type_str,
+             token_score,
+             token_text.c_str(),
+             bytes.c_str(),
+             visible_text.c_str(),
+             is_eog ? "[EOG]" : "");
+
+        // 特殊なパターンの検出（一般的なパターンを検出）
+        if (token_text.find("<|") != std::string::npos ||
+            token_text.find("|>") != std::string::npos ||
+            token_text.find("<s>") != std::string::npos ||
+            token_text.find("</s>") != std::string::npos) {
+            LOGi("    ^-- Potential special token pattern detected");
+        }
     }
+
+    // モデル情報の出力
+    LOGi("=== Model Info ===");
+    LOGi("Vocabulary size: %d", llama_n_vocab(model));
+    LOGi("Context size: %d", llama_n_ctx(context));
+    LOGi("Embedding size: %d", llama_n_embd(model));
+    LOGi("Number of layers: %d", llama_n_layer(model));
+
+    // ボキャブラリタイプの出力
+    enum llama_vocab_type vocab_type = llama_vocab_type(model);
+    const char* vocab_type_str;
+    switch (vocab_type) {
+        case LLAMA_VOCAB_TYPE_SPM:  vocab_type_str = "SentencePiece"; break;
+        case LLAMA_VOCAB_TYPE_BPE:  vocab_type_str = "BPE"; break;
+        case LLAMA_VOCAB_TYPE_WPM:  vocab_type_str = "WordPiece"; break;
+        case LLAMA_VOCAB_TYPE_NONE: vocab_type_str = "None"; break;
+        default:                    vocab_type_str = "Unknown"; break;
+    }
+    LOGi("Vocabulary type: %s", vocab_type_str);
 
     auto n_ctx = llama_n_ctx(context);
     auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
 
+    LOGi("=== Context Requirements ===");
     LOGi("n_len = %d, n_ctx = %d, n_kv_req = %zu", n_len, n_ctx, n_kv_req);
 
     if (n_kv_req > n_ctx) {
         LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");
-    }
-
-    for (auto id: tokens_list) {
-        LOGi("%s", llama_token_to_piece(context, id).c_str());
     }
 
     llama_batch_clear(*batch);
