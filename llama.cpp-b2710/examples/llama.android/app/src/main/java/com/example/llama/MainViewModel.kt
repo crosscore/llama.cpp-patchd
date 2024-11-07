@@ -29,13 +29,13 @@ class MainViewModel(
     var currentModelPath: String? by mutableStateOf(null)
         private set
 
-    var maxTokens by mutableIntStateOf(256)
+    var maxTokens by mutableIntStateOf(1024)
         private set
 
     var seed by mutableIntStateOf(42)
         private set
 
-    var contextSize by mutableIntStateOf(1024)
+    var contextSize by mutableIntStateOf(2048)
         private set
 
     var numThreads by mutableIntStateOf(4)
@@ -69,7 +69,7 @@ class MainViewModel(
     }
 
     fun updateMaxTokens(newMaxTokens: String) {
-        maxTokens = newMaxTokens.toIntOrNull() ?: 256
+        maxTokens = newMaxTokens.toIntOrNull() ?: 1024
     }
 
     fun updateSeed(newSeed: String) {
@@ -77,7 +77,7 @@ class MainViewModel(
     }
 
     fun updateContextSize(newContextSize: String) {
-        contextSize = newContextSize.toIntOrNull() ?: 1024
+        contextSize = newContextSize.toIntOrNull() ?: 2048
     }
 
     fun updateNumThreads(newNumThreads: String) {
@@ -86,7 +86,7 @@ class MainViewModel(
 
     // For SystemPrompt
     var systemPrompt by mutableStateOf(
-        """あなたはUserからの質問に日本語で簡潔に回答するAIアシスタントです。""".trimMargin()
+        """あなたはUserからの質問に30文字以内で簡潔に回答するAssistantです。""".trimMargin()
     )
         private set
 
@@ -107,12 +107,14 @@ class MainViewModel(
         message = ""
 
         val formattedPrompt = buildString {
-            appendLine("System:$systemPrompt")
-            appendLine("User:$text")
+            append("System:")
+            appendLine(systemPrompt)
+            append("User:")
+            appendLine(text)
             append("Assistant:")
         }
 
-        Log.d(tag, "Sending prompt: $formattedPrompt")
+        Log.d(tag, "--- Sending prompt ---\n$formattedPrompt")
         messages = messages + Pair(text, "")
         val currentIndex = messages.lastIndex
 

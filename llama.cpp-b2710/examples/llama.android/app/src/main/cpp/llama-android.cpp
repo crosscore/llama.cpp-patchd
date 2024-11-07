@@ -1,4 +1,6 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/cpp/llama-android.cpp
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "performance-no-int-to-ptr"
 #include <android/log.h>
 #include <jni.h>
 #include <iomanip>
@@ -11,6 +13,30 @@
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+
+// 特殊トークンの定義
+struct SpecialTokens {
+    static const int ENDOFTEXT = 0;      // <|endoftext|>
+    static const int PADDING = 1;        // <|padding|>
+    static const int CLS = 2;            // <|cls|>
+    static const int SEP = 3;            // <|sep|>
+    static const int USER = 4;           // <|user|>
+    static const int SYSTEM = 5;         // <|system|>
+    static const int ASSISTANT = 6;      // <|assistant|>
+    static const int ENDOFUSER = 7;      // <|endofuser|>
+    static const int ENDOFSYSTEM = 8;    // <|endofsystem|>
+    static const int ENDOFASSISTANT = 9; // <|endofassistant|>
+    static const int SENTENCE_END = 212; // 文終了マーカー
+    static const int PERIOD = 278;       // 句点(。)
+
+    static bool is_special(int token_id) {
+        return (token_id >= 0 && token_id <= 9) || token_id == SENTENCE_END;
+    }
+
+    static bool is_end_token(int token_id) {
+        return token_id == ENDOFTEXT || token_id == ENDOFASSISTANT;
+    }
+};
 
 namespace {
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
@@ -221,143 +247,29 @@ Java_com_example_llama_Llm_completion_1init(
 
     const auto *const text = env->GetStringUTFChars(jtext, nullptr);
     auto *const context = reinterpret_cast<llama_context *>(context_pointer);
-    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
-    auto *const model = llama_get_model(context);
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
+    llama_get_model(context);
 
-    LOGi("=== Input Analysis ===");
-    LOGi("Raw input text: %s", text);
+    LOGi("=== Prompt Analysis ===");
+    LOGi("Input text: %s", text);
 
     const auto tokens_list = llama_tokenize(context, text, true);
 
-    LOGi("=== Detailed Token Analysis ===");
     LOGi("Total tokens: %zu", tokens_list.size());
-
-    // 特殊トークンの取得
-    const llama_token bos_token = llama_token_bos(model);
-    const llama_token eos_token = llama_token_eos(model);
-    const llama_token nl_token = llama_token_nl(model);
-    const llama_token cls_token = llama_token_cls(model);
-    const llama_token sep_token = llama_token_sep(model);
-
-    LOGi("Special tokens:");
-    LOGi("- BOS token: %d", bos_token);
-    LOGi("- EOS token: %d", eos_token);
-    LOGi("- Newline token: %d", nl_token);
-    LOGi("- CLS token: %d", cls_token);
-    LOGi("- SEP token: %d", sep_token);
-
-    // トークンの詳細情報を出力
-    char piece_buf[128];
-    for (auto id: tokens_list) {
-        // トークンをテキストに変換
-        int32_t piece_len = llama_token_to_piece(model, id, piece_buf, sizeof(piece_buf), true);
-        if (piece_len < 0) {
-            LOGe("Failed to convert token to piece");
-            continue;
-        }
-        std::string token_text(piece_buf, piece_len);
-
-        // 制御文字やスペースの可視化
-        std::string visible_text = token_text;
-        for (size_t i = 0; i < visible_text.length(); i++) {
-            char c = visible_text[i];
-            if (c == '\n') {
-                visible_text.replace(i, 1, "\\n");
-                i++;
-            } else if (c == '\r') {
-                visible_text.replace(i, 1, "\\r");
-                i++;
-            } else if (c == '\t') {
-                visible_text.replace(i, 1, "\\t");
-                i++;
-            } else if (c == ' ') {
-                visible_text.replace(i, 1, "␣");
-            }
-        }
-
-        // バイト表現の取得
-        std::string bytes;
-        for (char c : token_text) {
-            char hex[8];
-            snprintf(hex, sizeof(hex), "\\x%02X", static_cast<unsigned char>(c));
-            bytes += hex;
-        }
-
-        // トークンタイプの取得
-        llama_token_type token_type = llama_token_get_type(model, id);
-        const char* type_str;
-        switch (token_type) {
-            case LLAMA_TOKEN_TYPE_UNDEFINED:    type_str = "UNDEFINED"; break;
-            case LLAMA_TOKEN_TYPE_NORMAL:       type_str = "NORMAL"; break;
-            case LLAMA_TOKEN_TYPE_UNKNOWN:      type_str = "UNKNOWN"; break;
-            case LLAMA_TOKEN_TYPE_CONTROL:      type_str = "CONTROL"; break;
-            case LLAMA_TOKEN_TYPE_USER_DEFINED: type_str = "USER_DEFINED"; break;
-            case LLAMA_TOKEN_TYPE_UNUSED:       type_str = "UNUSED"; break;
-            case LLAMA_TOKEN_TYPE_BYTE:         type_str = "BYTE"; break;
-            default:                            type_str = "???"; break;
-        }
-
-        // 特殊トークンのチェック
-        bool is_eog = llama_token_is_eog(model, id);
-
-        float token_score = llama_token_get_score(model, id);
-
-        // トークン情報の出力
-        LOGi("Token[%5d] | Type: %-11s | Score: %8.3f | Raw: '%-20s' | Bytes: %-30s | Visible: '%-20s' %s",
-             id,
-             type_str,
-             token_score,
-             token_text.c_str(),
-             bytes.c_str(),
-             visible_text.c_str(),
-             is_eog ? "[EOG]" : "");
-
-        // 特殊なパターンの検出（一般的なパターンを検出）
-        if (token_text.find("<|") != std::string::npos ||
-            token_text.find("|>") != std::string::npos ||
-            token_text.find("<s>") != std::string::npos ||
-            token_text.find("</s>") != std::string::npos) {
-            LOGi("    ^-- Potential special token pattern detected");
-        }
-    }
-
-    // モデル情報の出力
-    LOGi("=== Model Info ===");
-    LOGi("Vocabulary size: %d", llama_n_vocab(model));
-    LOGi("Context size: %d", llama_n_ctx(context));
-    LOGi("Embedding size: %d", llama_n_embd(model));
-    LOGi("Number of layers: %d", llama_n_layer(model));
-
-    // ボキャブラリタイプの出力
-    enum llama_vocab_type vocab_type = llama_vocab_type(model);
-    const char* vocab_type_str;
-    switch (vocab_type) {
-        case LLAMA_VOCAB_TYPE_SPM:  vocab_type_str = "SentencePiece"; break;
-        case LLAMA_VOCAB_TYPE_BPE:  vocab_type_str = "BPE"; break;
-        case LLAMA_VOCAB_TYPE_WPM:  vocab_type_str = "WordPiece"; break;
-        case LLAMA_VOCAB_TYPE_NONE: vocab_type_str = "None"; break;
-        default:                    vocab_type_str = "Unknown"; break;
-    }
-    LOGi("Vocabulary type: %s", vocab_type_str);
 
     auto n_ctx = llama_n_ctx(context);
     auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
 
-    LOGi("=== Context Requirements ===");
-    LOGi("n_len = %d, n_ctx = %d, n_kv_req = %zu", n_len, n_ctx, n_kv_req);
-
     if (n_kv_req > n_ctx) {
-        LOGe("error: n_kv_req > n_ctx, the required KV cache size is not big enough");
+        LOGe("Error: Required KV cache size (%zu) exceeds context size (%d)", n_kv_req, n_ctx);
     }
 
     llama_batch_clear(*batch);
 
-    // evaluate the initial prompt
     for (auto i = 0; i < tokens_list.size(); i++) {
         llama_batch_add(*batch, tokens_list[i], i, {0}, false);
     }
 
-    // llama_decode will output logits only for the last token of the prompt
     batch->logits[batch->n_tokens - 1] = true;
 
     if (llama_decode(context, *batch) != 0) {
@@ -379,8 +291,8 @@ Java_com_example_llama_Llm_completion_1loop(
         jint n_len,
         jobject intvar_ncur
 ) {
-    auto *const context = reinterpret_cast<llama_context *>(context_pointer); // NOLINT(*-no-int-to-ptr)
-    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer);
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
     const auto *const model = llama_get_model(context);
 
     if (!la_int_var) { la_int_var = env->GetObjectClass(intvar_ncur); }
@@ -399,32 +311,52 @@ Java_com_example_llama_Llm_completion_1loop(
 
     llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
 
-    // sample the most likely token
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
-
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
 
-    // EOSトークンの検出
-    if (llama_token_is_eog(model, new_token_id)) {
-        LOGi("Detected EOS TOKEN ID: %d", new_token_id);
+    bool is_eos = false;
+
+    // 1. 標準的なEOSトークンチェック
+    if (llama_token_is_eog(model, new_token_id) ||
+        SpecialTokens::is_end_token(new_token_id)) {
+        LOGi("Detected end token: %d", new_token_id);
+        is_eos = true;
+    }
+    // 2. 文終了パターンのチェック
+    else if (new_token_id == SpecialTokens::SENTENCE_END && batch->n_tokens > 0) {
+        auto prev_token = batch->token[batch->n_tokens - 1];
+        // 句点の後の文終了マーカー
+        if (prev_token == SpecialTokens::PERIOD) {
+            LOGi("Detected end of response pattern: %d", new_token_id);
+            is_eos = true;
+        }
+    }
+
+    if (is_eos) {
+        LOGi("is_eos: %d", is_eos);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
-    // MaxTokensに達した場合の処理
+    // MaxTokensのチェック
     if (n_cur >= n_len) {
         LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d)", n_cur, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
-    // トークンの処理
-    auto new_token_chars = llama_token_to_piece(context, new_token_id);
-    cached_token_chars += new_token_chars;
-
+    // トークン処理
     jstring new_token;
-    if (is_valid_utf8(cached_token_chars.c_str())) {
-        new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("cached_token: %s, new_token: %s, token_id: %d", cached_token_chars.c_str(), new_token_chars.c_str(), new_token_id);
-        cached_token_chars.clear();
+    if (!SpecialTokens::is_special(new_token_id)) {
+        auto new_token_chars = llama_token_to_piece(context, new_token_id);
+        cached_token_chars += new_token_chars;
+
+        if (is_valid_utf8(cached_token_chars.c_str())) {
+            new_token = env->NewStringUTF(cached_token_chars.c_str());
+            // デバッグ出力
+            LOGi("Token: [%d] %s", new_token_id, cached_token_chars.c_str());
+            cached_token_chars.clear();
+        } else {
+            new_token = env->NewStringUTF("");
+        }
     } else {
         new_token = env->NewStringUTF("");
     }
@@ -452,3 +384,5 @@ Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unuse
 #ifdef __cplusplus
 }
 #endif
+
+#pragma clang diagnostic pop
