@@ -311,35 +311,46 @@ Java_com_example_llama_Llm_completion_1loop(
 
     llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
 
+    // トークン選択とそのスコアをログ出力
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
+    float token_score = candidates[new_token_id].logit;
+
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
 
     bool is_eos = false;
+    std::string eos_reason;
 
     // 1. 標準的なEOSトークンチェック
-    if (llama_token_is_eog(model, new_token_id) ||
-        SpecialTokens::is_end_token(new_token_id)) {
-        LOGi("Detected end token: %d", new_token_id);
+    if (llama_token_is_eog(model, new_token_id)) {
+        eos_reason = "EOG token detected";
+        LOGi("%s: token_id=%d", eos_reason.c_str(), new_token_id);
         is_eos = true;
     }
-    // 2. 文終了パターンのチェック
+    else if (SpecialTokens::is_end_token(new_token_id)) {
+        eos_reason = "Special end token detected";
+        LOGi("%s: token_id=%d", eos_reason.c_str(), new_token_id);
+        is_eos = true;
+    }
+        // 2. 文終了パターンのチェック
     else if (new_token_id == SpecialTokens::SENTENCE_END && batch->n_tokens > 0) {
         auto prev_token = batch->token[batch->n_tokens - 1];
         // 句点の後の文終了マーカー
         if (prev_token == SpecialTokens::PERIOD) {
-            LOGi("Detected end of response pattern: %d", new_token_id);
+            eos_reason = "End of response pattern detected";
+            LOGi("%s: PERIOD + SENTENCE_END sequence (tokens: %d -> %d)",
+                 eos_reason.c_str(), prev_token, new_token_id);
             is_eos = true;
         }
     }
 
     if (is_eos) {
-        LOGi("is_eos: %d", is_eos);
+        LOGi("Generation ended: %s (total tokens generated: %d)", eos_reason.c_str(), n_cur);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
     // MaxTokensのチェック
     if (n_cur >= n_len) {
-        LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d)", n_cur, n_len);
+        LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d) - stopping generation", n_cur, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
@@ -351,13 +362,17 @@ Java_com_example_llama_Llm_completion_1loop(
 
         if (is_valid_utf8(cached_token_chars.c_str())) {
             new_token = env->NewStringUTF(cached_token_chars.c_str());
-            // デバッグ出力
-            LOGi("Token: [%d] %s", new_token_id, cached_token_chars.c_str());
+            // デバッグ出力を1行に統合
+            LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
+                 new_token_id, cached_token_chars.c_str(), token_score, n_cur + 1, n_len);
             cached_token_chars.clear();
         } else {
+            LOGi("Invalid UTF-8 sequence detected for token [%d], skipping", new_token_id);
             new_token = env->NewStringUTF("");
         }
     } else {
+        LOGi("Special token: [%d] (score: %.4f, position: %d/%d)",
+             new_token_id, token_score, n_cur + 1, n_len);
         new_token = env->NewStringUTF("");
     }
 
@@ -368,7 +383,7 @@ Java_com_example_llama_Llm_completion_1loop(
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
 
     if (llama_decode(context, *batch) != 0) {
-        LOGe("llama_decode() returned null");
+        LOGe("llama_decode() failed on token [%d]", new_token_id);
     }
 
     return new_token;
