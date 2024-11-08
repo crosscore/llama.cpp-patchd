@@ -86,7 +86,7 @@ class MainViewModel(
 
     // For SystemPrompt
     var systemPrompt by mutableStateOf(
-        """あなたはUserからの質問に30文字以内で簡潔に回答するAssistantです。""".trimMargin()
+        """あなたはUserからの質問や要望に対して簡潔に回答するAI Assistantです。""".trimMargin()
     )
         private set
 
