@@ -14,30 +14,6 @@
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
-// 特殊トークンの定義
-struct SpecialTokens {
-    static const int ENDOFTEXT = 0;      // <|endoftext|>
-    static const int PADDING = 1;        // <|padding|>
-    static const int CLS = 2;            // <|cls|>
-    static const int SEP = 3;            // <|sep|>
-    static const int USER = 4;           // <|user|>
-    static const int SYSTEM = 5;         // <|system|>
-    static const int ASSISTANT = 6;      // <|assistant|>
-    static const int ENDOFUSER = 7;      // <|endofuser|>
-    static const int ENDOFSYSTEM = 8;    // <|endofsystem|>
-    static const int ENDOFASSISTANT = 9; // <|endofassistant|>
-    static const int SENTENCE_END = 212; // 文終了マーカー
-    static const int PERIOD = 278;       // 句点(。)
-
-    static bool is_special(int token_id) {
-        return (token_id >= 0 && token_id <= 9) || token_id == SENTENCE_END;
-    }
-
-    static bool is_end_token(int token_id) {
-        return token_id == ENDOFTEXT || token_id == ENDOFASSISTANT;
-    }
-};
-
 namespace {
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
         if (level == GGML_LOG_LEVEL_ERROR) {
@@ -317,74 +293,96 @@ Java_com_example_llama_Llm_completion_1loop(
 
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
 
-    bool is_eos = false;
-    std::string eos_reason;
-
-    // 1. 標準的なEOSトークンチェック
+    // EOS token check
     if (llama_token_is_eog(model, new_token_id)) {
-        eos_reason = "EOG token detected";
-        LOGi("%s: token_id=%d", eos_reason.c_str(), new_token_id);
-        is_eos = true;
-    }
-    else if (SpecialTokens::is_end_token(new_token_id)) {
-        eos_reason = "Special end token detected";
-        LOGi("%s: token_id=%d", eos_reason.c_str(), new_token_id);
-        is_eos = true;
-    }
-        // 2. 文終了パターンのチェック
-    else if (new_token_id == SpecialTokens::SENTENCE_END && batch->n_tokens > 0) {
-        auto prev_token = batch->token[batch->n_tokens - 1];
-        // 句点の後の文終了マーカー
-        if (prev_token == SpecialTokens::PERIOD) {
-            eos_reason = "End of response pattern detected";
-            LOGi("%s: PERIOD + SENTENCE_END sequence (tokens: %d -> %d)",
-                 eos_reason.c_str(), prev_token, new_token_id);
-            is_eos = true;
-        }
-    }
+        char piece[64] = {0}; // バッファサイズは適切に調整
+        int length = llama_token_to_piece(model, new_token_id, piece, sizeof(piece), true);
 
-    if (is_eos) {
-        LOGi("Generation ended: %s (total tokens generated: %d)", eos_reason.c_str(), n_cur);
+        if (length >= 0) {
+            LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d) - EOS token detected",
+                 new_token_id,
+                 piece,
+                 token_score,
+                 n_cur + 1,
+                 n_len);
+        } else {
+            LOGi("Token[%d] '' (score: %.4f, position: %d/%d) - EOS token detected",
+                 new_token_id,
+                 token_score,
+                 n_cur + 1,
+                 n_len);
+        }
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
-    // MaxTokensのチェック
+    // Max tokens check
     if (n_cur >= n_len) {
         LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d) - stopping generation", n_cur, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
-    // トークン処理
+    // process tokens
     jstring new_token;
-    if (!SpecialTokens::is_special(new_token_id)) {
-        auto new_token_chars = llama_token_to_piece(context, new_token_id);
-        cached_token_chars += new_token_chars;
+    auto new_token_chars = llama_token_to_piece(context, new_token_id);
+    cached_token_chars += new_token_chars;
 
-        if (is_valid_utf8(cached_token_chars.c_str())) {
-            new_token = env->NewStringUTF(cached_token_chars.c_str());
-            // デバッグ出力を1行に統合
-            LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
-                 new_token_id, cached_token_chars.c_str(), token_score, n_cur + 1, n_len);
-            cached_token_chars.clear();
-        } else {
-            LOGi("Invalid UTF-8 sequence detected for token [%d], skipping", new_token_id);
-            new_token = env->NewStringUTF("");
+    if (is_valid_utf8(cached_token_chars.c_str())) {
+        // 改行文字を可視化して表示
+        std::string display_chars = cached_token_chars;
+        if (display_chars == "\n") {
+            display_chars = "\\n";
+
+            // バッチの更新とデコードを先に実行
+            llama_batch_clear(*batch);
+            llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+
+            if (llama_decode(context, *batch) != 0) {
+                LOGe("llama_decode() failed on token [%d]", new_token_id);
+            }
+
+            // 次のトークンをプレビューして"User:"のパターンをチェック
+            auto *next_logits = llama_get_logits_ith(context, 0);  // 最後のトークンのlogitsを取得
+            if (next_logits != nullptr) {
+                std::vector<llama_token_data> next_candidates;
+                next_candidates.reserve(n_vocab);
+                for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+                    next_candidates.emplace_back(
+                            llama_token_data{token_id, next_logits[token_id], 0.0f});
+                }
+                llama_token_data_array next_candidates_p = {next_candidates.data(),
+                                                            next_candidates.size(), false};
+                const auto next_token_id = llama_sample_token_greedy(context, &next_candidates_p);
+
+                auto next_chars = llama_token_to_piece(context, next_token_id);
+                if (next_chars == "User") {
+                    LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
+                         new_token_id, display_chars.c_str(), token_score, n_cur + 1, n_len);
+                    LOGi("Detected potential role switch to User, stopping generation");
+                    return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
+                }
+            }
         }
+
+        new_token = env->NewStringUTF(cached_token_chars.c_str());
+        LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
+             new_token_id, display_chars.c_str(), token_score, n_cur + 1, n_len);
+        cached_token_chars.clear();
     } else {
-        LOGi("Special token: [%d] (score: %.4f, position: %d/%d)",
-             new_token_id, token_score, n_cur + 1, n_len);
+        LOGi("Invalid UTF-8 sequence detected for token [%d], skipping", new_token_id);
         new_token = env->NewStringUTF("");
     }
 
-    // バッチの更新
-    llama_batch_clear(*batch);
-    llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+    // 改行以外のトークンの場合のバッチ更新
+    if (cached_token_chars != "\n") {
+        llama_batch_clear(*batch);
+        llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+
+        if (llama_decode(context, *batch) != 0) {
+            LOGe("llama_decode() failed on token [%d]", new_token_id);
+        }
+    }
 
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
-
-    if (llama_decode(context, *batch) != 0) {
-        LOGe("llama_decode() failed on token [%d]", new_token_id);
-    }
 
     return new_token;
 }

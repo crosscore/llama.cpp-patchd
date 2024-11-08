@@ -124,7 +124,7 @@ class MainViewModel(
                 llm.send(formattedPrompt, maxTokens, seed, contextSize, numThreads)
                     .onCompletion { cause ->
                         if (cause == null) {
-                            responseBuilder.append("[Output Completed]")
+                            responseBuilder.append(" [EOS]")
                             messages = messages.toMutableList().apply {
                                 this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                             }
@@ -133,7 +133,7 @@ class MainViewModel(
                     .catch { e ->
                         when (e) {
                             is Llm.MaxTokensReachedException -> {
-                                responseBuilder.append("[Max Tokens Limit Reached]")
+                                responseBuilder.append(" [Max Tokens Limit Reached]")
                                 messages = messages.toMutableList().apply {
                                     this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                                 }
