@@ -295,7 +295,7 @@ Java_com_example_llama_Llm_completion_1loop(
 
     // EOS token check
     if (llama_token_is_eog(model, new_token_id)) {
-        char piece[64] = {0}; // バッファサイズは適切に調整
+        char piece[64] = {0};
         int length = llama_token_to_piece(model, new_token_id, piece, sizeof(piece), true);
 
         if (length >= 0) {
@@ -312,7 +312,7 @@ Java_com_example_llama_Llm_completion_1loop(
                  n_cur + 1,
                  n_len);
         }
-        return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
+        return env->NewStringUTF("");
     }
 
     // Max tokens check

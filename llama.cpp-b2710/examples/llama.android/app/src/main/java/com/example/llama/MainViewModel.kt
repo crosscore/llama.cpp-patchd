@@ -90,7 +90,7 @@ class MainViewModel(
 
     // For SystemPrompt
     var systemPrompt by mutableStateOf(
-        """あなたはUserからの質問や要望に対して簡潔に回答するAI Assistantです。""".trimMargin()
+        """あなたはUserからの質問や要望に対して日本語で簡潔に回答するAssistantです。""".trimMargin()
     )
         private set
 
@@ -154,7 +154,6 @@ class MainViewModel(
                 llm.send(formattedPrompt, maxTokens, seed, contextSize, numThreads)
                     .onCompletion { cause ->
                         if (cause == null) {
-                            responseBuilder.append(" [EOS]")
                             messages = messages.toMutableList().apply {
                                 this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                             }
