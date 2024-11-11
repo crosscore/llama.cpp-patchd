@@ -41,6 +41,10 @@ class MainViewModel(
     var numThreads by mutableIntStateOf(4)
         private set
 
+    // 会話履歴の有効/無効状態
+    var isHistoryEnabled by mutableStateOf(false)
+        private set
+
     // Model loading state
     var isLoading by mutableStateOf(false)
         private set
@@ -101,17 +105,43 @@ class MainViewModel(
         showSystemPromptDialog = !showSystemPromptDialog
     }
 
+    // 会話履歴のトグル関数
+    fun toggleHistory() {
+        isHistoryEnabled = !isHistoryEnabled
+        if (!isHistoryEnabled) {
+            // 履歴を無効にした時は会話をクリア
+            clear()
+        }
+        log("Chat history ${if (isHistoryEnabled) "enabled" else "disabled"}")
+    }
+
     fun send() {
         val text = message.trim()
         if (text.isEmpty()) return
         message = ""
 
-        val formattedPrompt = buildString {
-            append("System:")
-            appendLine(systemPrompt)
-            append("User:")
-            appendLine(text)
-            append("Assistant:")
+        val formattedPrompt = if (isHistoryEnabled) {
+            buildString {
+                append("System:")
+                appendLine(systemPrompt)
+                messages.forEach { (user, assistant) ->
+                    append("User:")
+                    appendLine(user)
+                    append("Assistant:")
+                    appendLine(assistant)
+                }
+                append("User:")
+                appendLine(text)
+                append("Assistant:")
+            }
+        } else {
+            buildString {
+                append("System:")
+                appendLine(systemPrompt)
+                append("User:")
+                appendLine(text)
+                append("Assistant:")
+            }
         }
 
         Log.d(tag, "--- Sending prompt ---\n$formattedPrompt")
@@ -202,6 +232,16 @@ class MainViewModel(
 
     fun clear() {
         messages = listOf()
+        if (!isHistoryEnabled) {
+            // 履歴が無効の場合はKVキャッシュもクリア
+            viewModelScope.launch {
+                try {
+                    llm.clearKVCache()
+                } catch (e: Exception) {
+                    Log.e(tag, "Failed to clear KV cache", e)
+                }
+            }
+        }
     }
 
     fun log(message: String) {

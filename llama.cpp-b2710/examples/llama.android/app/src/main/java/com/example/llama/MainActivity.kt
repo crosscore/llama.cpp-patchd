@@ -29,6 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedTextField
@@ -162,7 +163,6 @@ fun MainCompose(
     onShowModelDialog: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
-
     val scrollState = rememberScrollState()
 
     Column(
@@ -170,6 +170,7 @@ fun MainCompose(
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
+        // Status Box (Memory and Model Path info)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -191,16 +192,15 @@ fun MainCompose(
             }
         }
 
-        val messageListState = rememberLazyListState()
-
+        // Chat Messages
         Box(
             modifier = Modifier
-                .weight(1f)
+                .fillMaxWidth()
+                .height(400.dp) // 固定の高さを設定
                 .border(1.dp, Color.Gray)
                 .padding(8.dp)
         ) {
             LazyColumn(
-                state = messageListState,
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(viewModel.messages) { (userMessage, llmResponse) ->
@@ -211,6 +211,7 @@ fun MainCompose(
             }
         }
 
+        // Message Input
         OutlinedTextField(
             value = viewModel.message,
             onValueChange = { viewModel.updateMessage(it) },
@@ -220,6 +221,7 @@ fun MainCompose(
                 .padding(vertical = 8.dp)
         )
 
+        // Parameter Controls
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -230,32 +232,29 @@ fun MainCompose(
                 value = viewModel.maxTokens.toString(),
                 onValueChange = { viewModel.updateMaxTokens(it) },
                 label = { Text("Max\nTokens") },
-                modifier = Modifier
-                    .weight(1f)
+                modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
                 value = viewModel.seed.toString(),
                 onValueChange = { viewModel.updateSeed(it) },
                 label = { Text("Seed") },
-                modifier = Modifier
-                    .weight(1f)
+                modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
                 value = viewModel.numThreads.toString(),
                 onValueChange = { viewModel.updateNumThreads(it) },
                 label = { Text("Threads") },
-                modifier = Modifier
-                    .weight(1f)
+                modifier = Modifier.weight(1f)
             )
             OutlinedTextField(
                 value = viewModel.contextSize.toString(),
                 onValueChange = { viewModel.updateContextSize(it) },
                 label = { Text("Context\nSize") },
-                modifier = Modifier
-                    .weight(1f)
+                modifier = Modifier.weight(1f)
             )
         }
 
+        // Action Buttons
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -271,8 +270,11 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
+        // Control Buttons Row 1
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
@@ -280,14 +282,28 @@ fun MainCompose(
             Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
         }
 
+        // Control Buttons Row 2
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(onClick = { viewModel.toggleSystemPromptDialog() }) { Text("System Prompt") }
+            Button(
+                onClick = { viewModel.toggleHistory() },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (viewModel.isHistoryEnabled)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text(if (viewModel.isHistoryEnabled) "History ON" else "History OFF")
+            }
         }
 
-        // Model Selection Dialog
+        // Dialogs
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
@@ -297,7 +313,6 @@ fun MainCompose(
             )
         }
 
-        // System Prompt Dialog
         if (viewModel.showSystemPromptDialog) {
             SystemPromptDialog(
                 onDismiss = { viewModel.toggleSystemPromptDialog() },

@@ -35,6 +35,18 @@ class Llm {
         }
     }.asCoroutineDispatcher()
 
+    // 追加: KVキャッシュをクリアする関数
+    fun clearKVCache() {
+        when (val state = threadLocalState.get()) {
+            is State.Loaded -> {
+                kv_cache_clear(state.context)
+            }
+            else -> {
+                Log.d(tag, "No model loaded, skipping KV cache clear")
+            }
+        }
+    }
+
     private external fun log_to_android()
     private external fun load_model(filename: String): Long
     private external fun free_model(model: Long)
@@ -60,7 +72,7 @@ class Llm {
         ncur: IntVar
     ): String?
 
-    private external fun kv_cache_clear(context: Long)
+    external fun kv_cache_clear(context: Long)
 
     private external fun new_context(model: Long, seed: Int, n_ctx: Int, n_threads: Int): Long
 
