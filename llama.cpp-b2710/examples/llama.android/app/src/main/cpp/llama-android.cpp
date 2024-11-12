@@ -357,7 +357,8 @@ Java_com_example_llama_Llm_completion_1loop(
                 if (next_chars == "User") {
                     LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
                          new_token_id, display_chars.c_str(), token_score, n_cur + 1, n_len);
-                    LOGi("Detected potential role switch to User, stopping generation");
+                    LOGi("Detected role switch - Next predicted token[%d] '%s' (score: %.4f), stopping generation",
+                         next_token_id, next_chars.c_str(), next_logits[next_token_id]);
                     return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
                 }
             }

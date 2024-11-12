@@ -42,7 +42,7 @@ class MainViewModel(
         private set
 
     // 会話履歴の有効/無効状態
-    var isHistoryEnabled by mutableStateOf(false)
+    var isHistoryEnabled by mutableStateOf(true)
         private set
 
     // Model loading state
