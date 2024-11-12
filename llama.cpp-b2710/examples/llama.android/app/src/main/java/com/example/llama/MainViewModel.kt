@@ -257,7 +257,7 @@ class MainViewModel(
 
     fun getAllMessages(): String {
         return messages.joinToString("\n") { (user, llm) ->
-            "User: $user\nLLM: $llm"
+            "User: $user\nAssistant: $llm"
         }
     }
 }

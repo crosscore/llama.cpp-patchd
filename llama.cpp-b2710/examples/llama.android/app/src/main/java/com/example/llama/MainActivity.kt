@@ -204,9 +204,17 @@ fun MainCompose(
             LazyColumn(
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(viewModel.messages) { (userMessage, llmResponse) ->
-                    Text(text = "User: $userMessage")
-                    Text(text = "LLM: $llmResponse")
+                items(viewModel.messages) { (userMessage, assistantResponse) ->
+                    Text(
+                        text = "User: $userMessage",
+                        color = Color(0xFF90CAF9),  // Blue 200
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
+                    Text(
+                        text = "Assistant: $assistantResponse",
+                        color = Color(0xFFA5D6A7),  // Green 200
+                        modifier = Modifier.padding(vertical = 2.dp)
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
             }
