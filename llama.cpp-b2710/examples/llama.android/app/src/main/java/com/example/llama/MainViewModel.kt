@@ -213,7 +213,7 @@ class MainViewModel(
                         loadingProgress = progress
                     }
                 currentModelPath = pathToModel
-                log("Loaded $pathToModel")
+                Log.i(tag, "Loaded $pathToModel") // Only Logcat
             } catch (exc: IllegalStateException) {
                 Log.e(tag, "load() failed", exc)
                 log(exc.message ?: "Unknown error")
@@ -244,7 +244,7 @@ class MainViewModel(
     }
 
     fun log(message: String) {
-        messages = messages + Pair("[System]", message)
+        Log.i(tag, message) // only Logcat
     }
 
     fun toggleMemoryInfo() {

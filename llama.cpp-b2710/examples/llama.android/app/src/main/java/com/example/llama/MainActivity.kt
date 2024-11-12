@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
 import android.text.format.Formatter
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -46,6 +47,7 @@ import com.example.llama.ui.theme.LlamaAndroidTheme
 import java.io.File
 
 class MainActivity : ComponentActivity() {
+    private val tag: String? = this::class.simpleName
 
     private val activityManager by lazy { getSystemService<ActivityManager>()!! }
     private val downloadManager by lazy { getSystemService<DownloadManager>()!! }
@@ -67,15 +69,14 @@ class MainActivity : ComponentActivity() {
                 .build()
         )
 
-        viewModel.log(
-            "Current memory: ${
-                Formatter.formatFileSize(
-                    this,
-                    availableMemory().availMem
-                )
-            } / ${Formatter.formatFileSize(this, availableMemory().totalMem)}"
-        )
-        viewModel.log("Downloads directory: ${getExternalFilesDir(null)}")
+        // Only Logcat
+        Log.i(tag, "Current memory: ${
+            Formatter.formatFileSize(
+                this,
+                availableMemory().availMem
+            )
+        } / ${Formatter.formatFileSize(this, availableMemory().totalMem)}")
+        Log.i(tag, "Downloads directory: ${getExternalFilesDir(null)}")
 
         // Initial loading of models
         loadModels()
