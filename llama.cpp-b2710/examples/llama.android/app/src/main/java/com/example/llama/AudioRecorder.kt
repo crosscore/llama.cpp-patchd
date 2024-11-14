@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import java.io.IOException
 import java.nio.ByteBuffer
-import java.nio.ShortBuffer
 
 class AudioRecorder private constructor(private val context: Context) {
     private val tag = "AudioRecorder"
@@ -54,14 +53,56 @@ class AudioRecorder private constructor(private val context: Context) {
     }
 
     /**
-     * 録音開始とデータのストリーミング
-     * @return ShortArrayのFlow
+     * AudioRecordの初期化（権限チェック付き）
      */
-    fun startRecording(): Flow<ShortArray> = flow {
+    @Throws(SecurityException::class, IllegalStateException::class)
+    private fun initializeAudioRecord() {
         if (!hasPermission()) {
             throw SecurityException("Recording permission not granted")
         }
 
+        if (audioRecord != null) {
+            return
+        }
+
+        try {
+            audioRecord = if (ActivityCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.RECORD_AUDIO
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
+                AudioRecord(
+                    MediaRecorder.AudioSource.MIC,
+                    SAMPLE_RATE,
+                    CHANNEL_CONFIG,
+                    AUDIO_FORMAT,
+                    bufferSize
+                )
+            } else {
+                throw SecurityException("Recording permission not granted")
+            }
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                releaseAudioRecord()
+                throw IllegalStateException("AudioRecord initialization failed")
+            }
+
+            audioRecord?.startRecording()
+            isRecording = true
+            Log.i(tag, "Audio recording started")
+        } catch (e: SecurityException) {
+            Log.e(tag, "Permission denied for audio recording", e)
+            throw e
+        } catch (e: IllegalStateException) {
+            Log.e(tag, "Failed to initialize AudioRecord", e)
+            throw e
+        }
+    }
+
+    /**
+     * 録音開始とデータのストリーミング
+     */
+    fun startRecording(): Flow<ShortArray> = flow {
         try {
             initializeAudioRecord()
 
@@ -85,40 +126,10 @@ class AudioRecorder private constructor(private val context: Context) {
                     }
                 }
             }
-        } catch (e: Exception) {
-            Log.e(tag, "Error in audio recording", e)
-            throw e
         } finally {
             releaseAudioRecord()
         }
     }.flowOn(Dispatchers.IO)
-
-    /**
-     * AudioRecordの初期化
-     */
-    @Throws(IllegalStateException::class)
-    private fun initializeAudioRecord() {
-        if (audioRecord != null) {
-            return
-        }
-
-        audioRecord = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT,
-            bufferSize
-        )
-
-        if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-            releaseAudioRecord()
-            throw IllegalStateException("AudioRecord initialization failed")
-        }
-
-        audioRecord?.startRecording()
-        isRecording = true
-        Log.i(tag, "Audio recording started")
-    }
 
     /**
      * 録音停止
@@ -129,47 +140,33 @@ class AudioRecorder private constructor(private val context: Context) {
         Log.i(tag, "Audio recording stopped")
     }
 
-    /**
-     * AudioRecordのリソース解放
-     */
     private fun releaseAudioRecord() {
-        audioRecord?.let { record ->
-            if (record.state == AudioRecord.STATE_INITIALIZED) {
-                try {
+        try {
+            audioRecord?.let { record ->
+                if (record.state == AudioRecord.STATE_INITIALIZED) {
                     record.stop()
-                } catch (e: IllegalStateException) {
-                    Log.e(tag, "Error stopping AudioRecord", e)
                 }
+                record.release()
             }
-            record.release()
+        } catch (e: Exception) {
+            Log.e(tag, "Error releasing AudioRecord", e)
+        } finally {
+            audioRecord = null
         }
-        audioRecord = null
     }
 
-    /**
-     * 録音中かどうかの確認
-     */
-    fun isRecording(): Boolean {
-        return isRecording
-    }
+    fun isRecording(): Boolean = isRecording
 
-    /**
-     * ByteArray形式のデータをShortArray形式に変換
-     */
     fun convertBytesToShorts(bytes: ByteArray): ShortArray {
         val shorts = ShortArray(bytes.size / 2)
         ByteBuffer.wrap(bytes).asShortBuffer().get(shorts)
         return shorts
     }
 
-    /**
-     * ShortArray形式のデータをByteArray形式に変換
-     */
     fun convertShortsToBytes(shorts: ShortArray): ByteArray {
         val bytes = ByteArray(shorts.size * 2)
         val buffer = ByteBuffer.wrap(bytes)
-        val shortBuffer = buffer.asShortBuffer()
-        shortBuffer.put(shorts)
+        buffer.asShortBuffer().put(shorts)
         return bytes
     }
 }
