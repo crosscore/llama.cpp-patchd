@@ -22,8 +22,7 @@ android {
             useSupportLibrary = true
         }
         ndk {
-            // Add NDK properties if wanted, e.g.
-            // abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
         }
         externalNativeBuild {
             cmake {
@@ -64,13 +63,12 @@ android {
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
-            // version = "3.22.1"
         }
     }
 }
 
 dependencies {
-
+    // 既存の依存関係
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation("androidx.activity:activity-compose:1.9.3")
@@ -79,6 +77,12 @@ dependencies {
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+
+    // Vosk関連の依存関係
+    implementation("com.alphacep:vosk-android:0.3.50@aar")
+    implementation("commons-io:commons-io:2.11.0")
+
+    // テスト関連
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
