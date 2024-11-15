@@ -1,10 +1,12 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainActivity.kt
 package com.example.llama
 
+import android.Manifest
 import android.app.ActivityManager
 import android.app.DownloadManager
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.StrictMode
@@ -13,6 +15,7 @@ import android.text.format.Formatter
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -28,7 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -40,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.app.ActivityCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -60,6 +64,16 @@ class MainActivity : ComponentActivity() {
     // Keep models as a mutable state list
     private val models = mutableStateListOf<Downloadable>()
 
+    // 音声認識のパーミッション要求用
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            // パーミッションが許可された場合の処理
+            initializeVoskViewModel()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -68,6 +82,9 @@ class MainActivity : ComponentActivity() {
                 .detectLeakedClosableObjects()
                 .build()
         )
+
+        // 音声認識のパーミッション確認
+        checkAudioPermission()
 
         // Only Logcat
         Log.i(tag, "Current memory: ${
@@ -83,12 +100,52 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             var showModelDialog by remember { mutableStateOf(false) }
+            var showPermissionRationale by remember { mutableStateOf(false) }
+            var showPermissionDenied by remember { mutableStateOf(false) }
 
             LlamaAndroidTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
+                    // Permission Rationale Dialog
+                    if (showPermissionRationale) {
+                        AlertDialog(
+                            onDismissRequest = { showPermissionRationale = false },
+                            title = { Text("マイク使用の許可が必要です") },
+                            text = { Text("音声認識機能を使用するために、マイクの使用許可が必要です。") },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showPermissionRationale = false
+                                        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                ) {
+                                    Text("許可する")
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { showPermissionRationale = false }) {
+                                    Text("キャンセル")
+                                }
+                            }
+                        )
+                    }
+
+                    // Permission Denied Dialog
+                    if (showPermissionDenied) {
+                        AlertDialog(
+                            onDismissRequest = { showPermissionDenied = false },
+                            title = { Text("権限が拒否されました") },
+                            text = { Text("音声認識機能を使用するには、設定からマイクの使用を許可してください。") },
+                            confirmButton = {
+                                Button(onClick = { showPermissionDenied = false }) {
+                                    Text("OK")
+                                }
+                            }
+                        )
+                    }
+
                     MainCompose(
                         viewModel = viewModel,
                         clipboard = clipboardManager,
@@ -107,6 +164,62 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun checkAudioPermission() {
+        when {
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                // パーミッションがすでに許可されている場合
+                initializeVoskViewModel()
+            }
+            shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
+                // パーミッションが必要な理由を説明する必要がある場合
+                setContent {
+                    var showDialog by remember { mutableStateOf(true) }
+                    if (showDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showDialog = false },
+                            title = { Text("マイク使用の許可が必要です") },
+                            text = { Text("音声認識機能を使用するために、マイクの使用許可が必要です。") },
+                            confirmButton = {
+                                Button(
+                                    onClick = {
+                                        showDialog = false
+                                        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                    }
+                                ) {
+                                    Text("許可する")
+                                }
+                            },
+                            dismissButton = {
+                                Button(onClick = { showDialog = false }) {
+                                    Text("キャンセル")
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            else -> {
+                // パーミッションを要求
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    private fun initializeVoskViewModel() {
+        // VoskViewModelの初期化
+        viewModel.initializeVosk(
+            VoskViewModel.Factory(
+                context = this,
+                onRecognitionResult = { text ->
+                    viewModel.updateMessage(text)
+                }
+            )
+        )
+    }
+
     private fun availableMemory(): ActivityManager.MemoryInfo {
         return ActivityManager.MemoryInfo().also { memoryInfo ->
             activityManager.getMemoryInfo(memoryInfo)
@@ -118,7 +231,7 @@ class MainActivity : ComponentActivity() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
-            file.isFile && file.extension == "gguf"
+            file.isFile && (file.extension == "gguf" || file.name == VoskRecognizer.DEFAULT_MODEL_NAME)
         }?.map { file ->
             Downloadable(
                 file.name,
@@ -166,12 +279,17 @@ fun MainCompose(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
+    // Recording state observer
+    val isRecording = viewModel.isRecording
+    val currentVoiceTranscript = viewModel.currentVoiceTranscript
+    val voiceError = viewModel.voiceRecognitionError
+
     Column(
         modifier = Modifier
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        // Status Box (Memory and Model Path info)
+        // ステータスボックス
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -193,11 +311,11 @@ fun MainCompose(
             }
         }
 
-        // Chat Messages
+        // チャットメッセージ表示エリア
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(400.dp) // 固定の高さを設定
+                .height(400.dp)
                 .border(1.dp, Color.Gray)
                 .padding(8.dp)
         ) {
@@ -207,12 +325,12 @@ fun MainCompose(
                 items(viewModel.messages) { (userMessage, assistantResponse) ->
                     Text(
                         text = "User: $userMessage",
-                        color = Color(0xFF90CAF9),  // Blue 200
+                        color = Color(0xFF90CAF9),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Text(
                         text = "Assistant: $assistantResponse",
-                        color = Color(0xFFA5D6A7),  // Green 200
+                        color = Color(0xFFA5D6A7),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -220,17 +338,30 @@ fun MainCompose(
             }
         }
 
-        // Message Input
-        OutlinedTextField(
-            value = viewModel.message,
-            onValueChange = { viewModel.updateMessage(it) },
-            label = { Text("Message") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
-        )
+        // メッセージ入力欄と音声認識中の表示
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            OutlinedTextField(
+                value = viewModel.message,
+                onValueChange = { viewModel.updateMessage(it) },
+                label = { Text("Message") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
 
-        // Parameter Controls
+            // 音声認識中のトランスクリプト表示
+            if (isRecording && currentVoiceTranscript.isNotBlank()) {
+                Text(
+                    text = "認識中: $currentVoiceTranscript",
+                    color = Color(0xFF64B5F6),
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
+            }
+        }
+
+        // パラメータコントロール
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -263,7 +394,7 @@ fun MainCompose(
             )
         }
 
-        // Action Buttons
+        // アクションボタン
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -279,7 +410,7 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        // Control Buttons Row 1
+        // コントロールボタン行1
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -291,7 +422,7 @@ fun MainCompose(
             Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
         }
 
-        // Control Buttons Row 2
+        // コントロールボタン行2
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -312,7 +443,33 @@ fun MainCompose(
             }
         }
 
-        // Dialogs
+        // 音声入力ボタン行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = {
+                    if (isRecording) {
+                        viewModel.stopVoiceRecording()
+                    } else {
+                        viewModel.startVoiceRecording()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRecording)
+                        MaterialTheme.colorScheme.error
+                    else
+                        MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(if (isRecording) "Stop" else "Record")
+            }
+        }
+
+        // ダイアログ表示
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
@@ -327,6 +484,20 @@ fun MainCompose(
                 onDismiss = { viewModel.toggleSystemPromptDialog() },
                 currentPrompt = viewModel.systemPrompt,
                 onUpdatePrompt = { viewModel.updateSystemPrompt(it) }
+            )
+        }
+
+        // エラーダイアログ
+        voiceError?.let { error ->
+            AlertDialog(
+                onDismissRequest = { viewModel.clearVoiceError() },
+                title = { Text("音声認識エラー") },
+                text = { Text(error) },
+                confirmButton = {
+                    Button(onClick = { viewModel.clearVoiceError() }) {
+                        Text("OK")
+                    }
+                }
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.example.llama
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import org.vosk.Model
@@ -33,6 +34,12 @@ class VoskRecognizer private constructor(private val context: Context) {
 
         override fun onResult(hypothesis: String) {
             // 最終的な認識結果
+            onResult?.invoke(hypothesis)
+        }
+
+        // 抽象メソッドの実装
+        override fun onFinalResult(hypothesis: String) {
+            // 最終結果（onResultと同様の処理）
             onResult?.invoke(hypothesis)
         }
 
@@ -135,6 +142,7 @@ class VoskRecognizer private constructor(private val context: Context) {
     }
 
     companion object {
+        @SuppressLint("StaticFieldLeak")
         @Volatile
         private var instance: VoskRecognizer? = null
 

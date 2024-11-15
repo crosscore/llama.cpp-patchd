@@ -79,7 +79,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
 
     // Vosk関連の依存関係
-    implementation("net.java.dev.jna:jna:5.12.1")
     implementation("com.alphacephei:vosk-android:0.3.47")
     implementation("commons-io:commons-io:2.11.0")
 
