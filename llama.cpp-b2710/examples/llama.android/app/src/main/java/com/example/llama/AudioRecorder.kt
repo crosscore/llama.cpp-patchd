@@ -13,9 +13,9 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import java.io.IOException
-import java.nio.ByteBuffer
 
-class AudioRecorder private constructor(private val context: Context) {
+class AudioRecorder private constructor(context: Context) {
+    private val appContext = context.applicationContext
     private val tag = "AudioRecorder"
 
     companion object {
@@ -47,7 +47,7 @@ class AudioRecorder private constructor(private val context: Context) {
      */
     fun hasPermission(): Boolean {
         return ActivityCompat.checkSelfPermission(
-            context,
+            appContext,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
     }
@@ -67,7 +67,7 @@ class AudioRecorder private constructor(private val context: Context) {
 
         try {
             audioRecord = if (ActivityCompat.checkSelfPermission(
-                    context,
+                    appContext,
                     Manifest.permission.RECORD_AUDIO
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
@@ -153,20 +153,5 @@ class AudioRecorder private constructor(private val context: Context) {
         } finally {
             audioRecord = null
         }
-    }
-
-    fun isRecording(): Boolean = isRecording
-
-    fun convertBytesToShorts(bytes: ByteArray): ShortArray {
-        val shorts = ShortArray(bytes.size / 2)
-        ByteBuffer.wrap(bytes).asShortBuffer().get(shorts)
-        return shorts
-    }
-
-    fun convertShortsToBytes(shorts: ShortArray): ByteArray {
-        val bytes = ByteArray(shorts.size * 2)
-        val buffer = ByteBuffer.wrap(bytes)
-        buffer.asShortBuffer().put(shorts)
-        return bytes
     }
 }

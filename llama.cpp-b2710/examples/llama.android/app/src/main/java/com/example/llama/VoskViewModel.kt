@@ -24,11 +24,9 @@ class VoskViewModel(
     private val audioRecorder = AudioRecorder.getInstance(context)
 
     // 音声認識の状態
-    var isRecording by mutableStateOf(false)
-        private set
+    private var isRecording by mutableStateOf(false)
 
-    var isModelInitialized by mutableStateOf(false)
-        private set
+    private var isModelInitialized by mutableStateOf(false)
 
     var currentTranscript by mutableStateOf("")
         private set
@@ -66,7 +64,7 @@ class VoskViewModel(
 
     private fun setupRecognitionCallbacks() {
         voskRecognizer.onPartialResult = { hypothesis ->
-            try {
+            val any = try {
                 val json = JSONObject(hypothesis)
                 json.optString("partial")?.let { partial ->
                     currentTranscript = partial
