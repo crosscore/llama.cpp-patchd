@@ -1,5 +1,6 @@
 package com.example.llama
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -15,13 +16,14 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 class VoskViewModel(
-    private val context: Context,
+    @SuppressLint("StaticFieldLeak")
+    context: Context,
     private val onRecognitionResult: (String) -> Unit
 ) : ViewModel() {
+    private val appContext = context.applicationContext
+    private val voskRecognizer = VoskRecognizer.getInstance(appContext)
+    private val audioRecorder = AudioRecorder.getInstance(appContext)
     private val tag = "VoskViewModel"
-
-    private val voskRecognizer = VoskRecognizer.getInstance(context)
-    private val audioRecorder = AudioRecorder.getInstance(context)
 
     // 音声認識の状態
     private var isRecording by mutableStateOf(false)
@@ -64,9 +66,8 @@ class VoskViewModel(
 
     private fun setupRecognitionCallbacks() {
         voskRecognizer.onPartialResult = { hypothesis ->
-            val any = try {
-                val json = JSONObject(hypothesis)
-                json.optString("partial")?.let { partial ->
+            try {
+                JSONObject(hypothesis).optString("partial").let { partial ->
                     currentTranscript = partial
                 }
             } catch (e: Exception) {
@@ -77,7 +78,7 @@ class VoskViewModel(
         voskRecognizer.onResult = { result ->
             try {
                 val json = JSONObject(result)
-                json.optString("text")?.let { text ->
+                json.optString("text").let { text ->
                     if (text.isNotBlank()) {
                         currentTranscript = text
                         onRecognitionResult(text)
@@ -115,7 +116,7 @@ class VoskViewModel(
                 voskRecognizer.startListening()
 
                 audioRecorder.startRecording()
-                    .onEach { audioData ->
+                    .onEach { _ -> // replace audioData to "_"
                         // 音声データをVoskに送信
                         // 必要に応じてここでデータ変換を行う
                     }

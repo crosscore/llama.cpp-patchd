@@ -56,6 +56,13 @@
 - 対応モデル: vosk-model-small-ja-0.22
 - GGUFモデルと同一ディレクトリでの管理
 
+### 利用モデル
+- https://alphacephei.com/vosk/models
+```
+vosk-model-small-ja-0.22	48M	9.52(csj CER) 17.07(ted10k CER)	Lightweight wideband model for Japanese	Apache 2.0
+vosk-model-ja-0.22	1Gb	8.40(csj CER) 13.91(ted10k CER)	Big model for Japanese	Apache 2.0
+```
+
 ## 5. 今後の改善可能項目
 
 1. ユーザビリティ
