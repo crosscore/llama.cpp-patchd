@@ -1,201 +1,192 @@
-# Android端末でのリアルタイム話者分離の実装調査
+# Android会議支援システム 実装計画書
 
-## 1. 概要
-本文書では、Android端末上でのリアルタイム話者分離の実装に関する技術要素と課題を整理します。特に、Pyannote.audioのKotlinベースシステムへの移植性に焦点を当てた分析を含みます。
+## 1. システム概要
 
-## 2. Pyannote.audioの移植性分析
+### 1.1 目的
+- リアルタイム会議支援（ファシリテーション）
+- 会議内容の自動議事録化
+- 話者の識別と発言の整理
 
-### 2.1 移植における主要な課題
-1. **Pythonライブラリの依存関係**
-   - PyTorch依存
-   - torchaudio依存
-   - numpy依存
-   - soundfile依存
+### 1.2 主要機能
+1. リアルタイム音声認識（Vosk）
+2. 話者分離（WebRTC VAD + カスタム実装）
+3. テキスト要約・分析（GGUF）
+4. ファシリテーション支援
 
-2. **移植オプションと課題**
-   ```kotlin
-   // Option 1: ONNX Runtime経由
-   class PyannoteOnnxModel(
-       private val context: Context,
-       private val modelPath: String
-   ) {
-       private val ortSession: OrtSession
+## 2. 実装方針
 
-       init {
-           val env = OrtEnvironment.getEnvironment()
-           ortSession = env.createSession(
-               context.assets.open(modelPath).readBytes()
-           )
-       }
+### 2.1 話者分離機能の段階的実装
 
-       fun process(audioData: FloatArray): DiarizationResult {
-           // ONNXモデルの入力形式に変換
-           // 推論実行
-           // 結果の解析と変換
-       }
-   }
+#### Phase 1: 基本的な音声区間検出
+```kotlin
+class VoiceActivityDetector(context: Context) {
+    private val webRtcVad: WebRtcVad = WebRtcVad()
 
-   // Option 2: TensorFlow Lite経由
-   class PyannoteTFLiteModel(
-       private val context: Context,
-       private val modelPath: String
-   ) {
-       private val interpreter: Interpreter
+    fun detectVoiceSegments(audioData: ShortArray): List<AudioSegment> {
+        // 1. フレーム分割
+        // 2. VAD処理
+        // 3. セグメント結合
+        return segments
+    }
+}
+```
 
-       init {
-           interpreter = Interpreter(
-               context.assets.open(modelPath).readBytes()
-           )
-       }
+#### Phase 2: 話者特徴量抽出
+```kotlin
+class SpeakerFeatureExtractor(context: Context) {
+    private val tfliteInterpreter: Interpreter
 
-       fun process(audioData: FloatArray): DiarizationResult {
-           // TFLiteモデルの入力形式に変換
-           // 推論実行
-           // 結果の解析と変換
-       }
-   }
-   ```
+    fun extractFeatures(segment: AudioSegment): FloatArray {
+        // 1. MFCC特徴量抽出
+        // 2. 話者埋め込み計算
+        return features
+    }
+}
+```
 
-### 2.2 変換プロセスの課題
-1. **モデルアーキテクチャの変換**
-   - PyTorchモデルからONNX/TFLiteへの変換時の精度損失
-   - カスタムレイヤーの対応
-   - 量子化による影響
+#### Phase 3: 話者クラスタリング
+```kotlin
+class SpeakerClustering {
+    fun clusterSpeakers(
+        segments: List<AudioSegment>,
+        features: List<FloatArray>
+    ): List<SpeakerSegment> {
+        // 1. 特徴量クラスタリング
+        // 2. 話者ID割り当て
+        return speakerSegments
+    }
+}
+```
 
-2. **前処理/後処理の移植**
-   ```kotlin
-   class AudioPreProcessor {
-       fun preprocessAudio(
-           rawAudio: ShortArray,
-           sampleRate: Int
-       ): FloatArray {
-           // MFCC特徴量の抽出
-           // 正規化
-           // フレーム分割
-           return processedAudio
-       }
-   }
+### 2.2 ファシリテーション機能の実装
 
-   class DiarizationPostProcessor {
-       fun processResults(
-           modelOutput: FloatArray,
-           threshold: Float
-       ): List<SpeakerSegment> {
-           // クラスタリング
-           // セグメント化
-           // 話者ID割り当て
-           return segments
-       }
-   }
-   ```
+```kotlin
+class MeetingFacilitator(
+    private val context: Context,
+    private val llm: Llm
+) {
+    suspend fun analyzeMeetingState(
+        recentUtterances: List<SpeakerUtterance>
+    ): FacilitationAction {
+        // 1. 発言パターン分析
+        // 2. 会議進行状況確認
+        // 3. 介入必要性判断
+        return suggestedAction
+    }
+}
+```
 
-## 3. 処理負荷の再評価
+## 3. 処理負荷分析
 
-### 3.1 処理負荷の比較（重い順）
-1. **リアルタイム話者分離（Pyannote.audio）**
-   - 推論処理: 45-50%
-   - 前処理: 25-30%
-   - 後処理: 25-30%
-   - **総負荷: 100%（基準）**
+### 3.1 基準負荷（CPU使用率）
+GGUFによる5分間の議事録要約: 100%（基準値）
 
-2. **5分ごとのGGUF要約**
-   - テキスト処理: 30-35%
-   - 推論処理: 40-45%
-   - **総負荷: 70-80%**
+### 3.2 各機能の相対的負荷
 
-3. **リアルタイム音声認識（Vosk）**
-   - 音声処理: 15-20%
-   - 推論処理: 15-20%
-   - **総負荷: 30-40%**
+1. **リアルタイム音声認識（Vosk）**
+- CPU: 30-40%
+- メモリ: 150-200MB
+- バッテリー影響: 中
+- 特徴: 常時実行が必要だが、最適化されている
 
-### 3.2 移植後の予想される追加負荷
-1. **JNIブリッジのオーバーヘッド**: 5-10%
-2. **データ変換処理**: 3-5%
-3. **メモリ管理**: 2-3%
+2. **話者分離処理**
+- Phase 1 (VAD)
+  - CPU: 10-15%
+  - メモリ: 50-100MB
+  - バッテリー影響: 低
 
-## 4. 移植戦略
+- Phase 2 (特徴抽出)
+  - CPU: 20-25%
+  - メモリ: 100-150MB
+  - バッテリー影響: 中
 
-### 4.1 段階的アプローチ
-1. **フェーズ1: モデル変換と検証**
-   ```python
-   # PyTorchモデルからONNXへの変換
-   import torch
+- Phase 3 (クラスタリング)
+  - CPU: 15-20%
+  - メモリ: 50-100MB
+  - バッテリー影響: 中
 
-   def convert_to_onnx(model, input_shape):
-       dummy_input = torch.randn(input_shape)
-       torch.onnx.export(
-           model,
-           dummy_input,
-           "pyannote_model.onnx",
-           input_names=["input"],
-           output_names=["output"],
-           dynamic_axes={
-               "input": {0: "batch_size"},
-               "output": {0: "batch_size"}
-           }
-       )
-   ```
+3. **ファシリテーション分析**
+- CPU: 40-50%
+- メモリ: 200-300MB
+- バッテリー影響: 高
+- 特徴: 定期的な実行（30秒〜1分間隔）
 
-2. **フェーズ2: Kotlin実装**
-   ```kotlin
-   class PyannoteDiarization(
-       context: Context,
-       modelConfig: ModelConfig
-   ) {
-       private val preprocessor = AudioPreProcessor()
-       private val model = when(modelConfig.type) {
-           ModelType.ONNX -> PyannoteOnnxModel(context, modelConfig.path)
-           ModelType.TFLITE -> PyannoteTFLiteModel(context, modelConfig.path)
-       }
-       private val postprocessor = DiarizationPostProcessor()
+### 3.3 総合負荷予測
 
-       suspend fun process(
-           audioData: ShortArray
-       ): Flow<DiarizationResult> = flow {
-           val processed = preprocessor.preprocessAudio(audioData)
-           val prediction = model.process(processed)
-           val results = postprocessor.processResults(prediction)
-           emit(results)
-       }.flowOn(Dispatchers.Default)
-   }
-   ```
+#### 通常動作時（音声認識 + VAD）
+- CPU: 40-55%
+- メモリ: 200-300MB
+- バッテリー消費: 中程度
 
-3. **フェーズ3: 最適化**
-   - ネイティブコード移行
-   - バッチ処理の実装
+#### 最大負荷時（全機能動作）
+- CPU: 90-120%
+- メモリ: 400-600MB
+- バッテリー消費: 高
+
+## 4. 最適化戦略
+
+### 4.1 処理の優先順位付け
+1. 音声認識（最優先・常時）
+2. VAD処理（最優先・常時）
+3. 話者特徴抽出（準優先・定期）
+4. クラスタリング（通常・定期）
+5. ファシリテーション分析（通常・定期）
+
+### 4.2 リソース管理
+```kotlin
+class ResourceManager {
+    fun adjustProcessingLevel(
+        batteryLevel: Int,
+        cpuUsage: Float,
+        temperature: Float
+    ): ProcessingMode {
+        return when {
+            batteryLevel < 15 -> ProcessingMode.MINIMAL
+            temperature > 40f -> ProcessingMode.REDUCED
+            cpuUsage > 90f -> ProcessingMode.BALANCED
+            else -> ProcessingMode.FULL
+        }
+    }
+}
+```
+
+### 4.3 バッチ処理の活用
+- 音声データの一時バッファリング
+- 特徴抽出の定期実行
+- クラスタリングの間隔調整
+
+## 5. 今後の課題
+
+1. **パフォーマンス最適化**
+   - JNIオーバーヘッドの削減
    - メモリ使用量の最適化
+   - バッテリー消費の抑制
 
-### 4.2 代替アプローチの検討
-1. **ハイブリッドアプローチ**
-   - 軽量なVAD処理はデバイス上で実行
-   - 話者分離処理はサーバーサイドで実行
+2. **精度向上**
+   - 話者識別の精度改善
+   - ノイズ耐性の向上
+   - ファシリテーション判断の改善
 
-2. **段階的な機能導入**
-   - まずは基本的なVAD機能のみを実装
-   - デバイス性能に応じて話者分離機能を有効化
+3. **ユーザビリティ**
+   - UI/UXの改善
+   - 設定の柔軟性向上
+   - エラー処理の強化
 
-## 5. 今後の検討事項
+## 6. 開発スケジュール
 
-1. **移植性の評価基準の確立**
-   - パフォーマンスメトリクス
-   - メモリ使用量
-   - バッテリー消費
+1. **Phase 1 (2-3週間)**
+   - WebRTC VAD実装
+   - 基本的な音声区間検出
 
-2. **代替ライブラリの調査**
-   - TensorFlow Lite用の既存モデル
-   - AndroidネイティブのVADソリューション
+2. **Phase 2 (3-4週間)**
+   - 特徴抽出実装
+   - TFLiteモデル統合
 
-3. **ハイブリッド実装の可能性**
-   - エッジデバイスとの連携
-   - クラウドサービスの活用
+3. **Phase 3 (4-5週間)**
+   - クラスタリング実装
+   - ファシリテーション基本機能
 
-## 6. まとめ
-Pyannote.audioのKotlinベースシステムへの移植は技術的に可能ですが、大きな課題があります。特に、モデルの変換とパフォーマンスの最適化が重要です。段階的な実装アプローチを採用し、まずは基本機能の実装から始める必要があります。
-
-実装の優先順位としては：
-1. 基本的な音声認識機能の最適化
-2. 軽量なVAD機能の実装
-3. GGUFによる要約処理の追加
-4. 完全な話者分離機能の実装
-
-という順序が望ましいと考えられます。
+4. **Phase 4 (2-3週間)**
+   - 最適化
+   - テスト
+   - ドキュメント作成
