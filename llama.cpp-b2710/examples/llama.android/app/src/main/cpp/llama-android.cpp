@@ -275,80 +275,60 @@ Java_com_example_llama_Llm_completion_1loop(
     if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I"); }
     if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V"); }
 
+    // トークンの選択
     auto n_vocab = llama_n_vocab(model);
     auto *logits = llama_get_logits_ith(context, batch->n_tokens - 1);
-
     std::vector<llama_token_data> candidates;
     candidates.reserve(n_vocab);
-
     for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
         candidates.emplace_back(llama_token_data{token_id, logits[token_id], 0.0f});
     }
-
     llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
-
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
     float token_score = candidates[new_token_id].logit;
-
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
 
-    // Detailed token info for debugging
-    LOGi("Processing token [%d] at position %d/%d (score: %.4f)",
+    // ログ出力：トークン情報
+    LOGi("Token[%d] at position %d/%d (score: %.4f)",
          new_token_id, n_cur + 1, n_len, token_score);
 
-    // Check for special tokens first
-    if (new_token_id == 0 || new_token_id == 1 || // Common EOS tokens
-        new_token_id == 2 || // Possible special token
-        llama_token_is_eog(model, new_token_id) ) {
-        LOGi("Special token detected (id: %d) at position: %d/%d",
+    // 基本的なチェック
+    if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
+        LOGi("EOS/EOG token detected (id: %d) at position: %d/%d",
              new_token_id, n_cur + 1, n_len);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
-
-    // Max tokens check
     if (n_cur >= n_len) {
-        LOGi("MAX_TOKENS_REACHED: n_cur(%d) >= n_len(%d)", n_cur, n_len);
+        LOGi("Max tokens reached: %d/%d", n_cur, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
-    // Get the token piece with error checking
+    // トークンからピースへの変換
     char piece[64] = {0};
     int length = llama_token_to_piece(model, new_token_id, piece, sizeof(piece), true);
-
     if (length < 0) {
-        LOGi("Token to piece conversion failed for token [%d]", new_token_id);
+        LOGi("Token[%d]: Conversion failed", new_token_id);
         llama_batch_clear(*batch);
         llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
-        if (llama_decode(context, *batch) != 0) {
-            LOGe("llama_decode() failed on token [%d]", new_token_id);
-        }
+        llama_decode(context, *batch);
         env->CallVoidMethod(intvar_ncur, la_int_var_inc);
         return env->NewStringUTF("");
     }
 
-    // Debug: Print exact bytes received
-    LOGi("Token [%d] raw bytes:", new_token_id);
+    // ログ出力：バイト情報
+    std::string bytes_log = "Bytes: ";
     for (int i = 0; i < length; i++) {
-        LOGi("  Byte %d: 0x%02X", i, (unsigned char)piece[i]);
+        char hex[8];
+        snprintf(hex, sizeof(hex), "0x%02X ", (unsigned char)piece[i]);
+        bytes_log += hex;
     }
+    LOGi("Token[%d]: %s", new_token_id, bytes_log.c_str());
 
-    // Add to cached token chars
-    std::string new_piece(piece, length);
-    cached_token_chars += new_piece;
-
-    // Debug: Print accumulated bytes
-    LOGi("Accumulated UTF-8 bytes:");
-    for (unsigned char c : cached_token_chars) {
-        LOGi("  0x%02X", c);
-    }
-
-    // Process the token(s)
-    jstring new_token;
+    // UTF-8シーケンスの処理
+    cached_token_chars += std::string(piece, length);
     bool is_valid = is_valid_utf8(cached_token_chars.c_str());
-    bool is_complete = true;
     bool needs_next_token = false;
 
-    // Check if we have a complete UTF-8 sequence
     if (!cached_token_chars.empty()) {
         unsigned char first_byte = cached_token_chars[0];
         size_t expected_length = 0;
@@ -357,26 +337,21 @@ Java_com_example_llama_Llm_completion_1loop(
         else if ((first_byte & 0xF0) == 0xE0) expected_length = 3;
         else if ((first_byte & 0xF8) == 0xF0) expected_length = 4;
 
-        is_complete = (cached_token_chars.length() >= expected_length);
+        needs_next_token = cached_token_chars.length() < expected_length;
 
-        // Check if this might be part of a multi-token character
-        if (!is_complete && cached_token_chars.length() < expected_length) {
-            needs_next_token = true;
-        }
-
-        LOGi("UTF-8 sequence analysis: expected_length=%zu, current_length=%zu, is_valid=%d, is_complete=%d, needs_next=%d",
-             expected_length, cached_token_chars.length(), is_valid, is_complete, needs_next_token);
+        LOGi("UTF-8 analysis - Expected: %zu, Current: %zu, Valid: %d, Needs next: %d",
+             expected_length, cached_token_chars.length(), is_valid, needs_next_token);
     }
 
-    if (is_valid && is_complete) {
+    jstring new_token;
+    if (is_valid && !needs_next_token) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("Complete UTF-8 sequence: Token[%d] '%s'", new_token_id, cached_token_chars.c_str());
+        LOGi("Token[%d] -> '%s'", new_token_id, cached_token_chars.c_str());
         cached_token_chars.clear();
     } else if (needs_next_token) {
-        // Try to get the next token to complete the sequence
+        // 次のトークンの準備
         llama_batch_clear(*batch);
         llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
-
         if (llama_decode(context, *batch) == 0) {
             auto *next_logits = llama_get_logits_ith(context, 0);
             if (next_logits != nullptr) {
@@ -390,68 +365,41 @@ Java_com_example_llama_Llm_completion_1loop(
 
                 char next_piece[64] = {0};
                 int next_length = llama_token_to_piece(model, next_token_id, next_piece, sizeof(next_piece), true);
-
                 if (next_length > 0) {
-                    LOGi("Found continuation token [%d] with length %d", next_token_id, next_length);
-
-                    // Debug the continuation token
-                    LOGi("Continuation token bytes:");
-                    for (int i = 0; i < next_length; i++) {
-                        LOGi("  Byte %d: 0x%02X", i, (unsigned char)next_piece[i]);
-                    }
-
-                    // Try to combine current and next token
                     std::string combined = cached_token_chars + std::string(next_piece, next_length);
-                    LOGi("Attempting to combine tokens (total bytes: %zu):", combined.length());
-                    for (unsigned char c : combined) {
-                        LOGi("  0x%02X", c);
-                    }
-
                     if (is_valid_utf8(combined.c_str())) {
-                        LOGi("Successfully combined into valid UTF-8: '%s'", combined.c_str());
                         cached_token_chars = combined;
                         new_token = env->NewStringUTF(cached_token_chars.c_str());
+                        LOGi("Tokens[%d,%d] combined -> '%s'",
+                             new_token_id, next_token_id, cached_token_chars.c_str());
                         cached_token_chars.clear();
                     } else {
-                        LOGi("Combined sequence is still invalid UTF-8, continuing accumulation");
+                        LOGi("Invalid combination of tokens [%d,%d]", new_token_id, next_token_id);
                         new_token = env->NewStringUTF("");
                     }
                 } else {
-                    LOGi("Continuation token conversion failed");
+                    LOGi("Next token[%d] conversion failed", next_token_id);
                     new_token = env->NewStringUTF("");
                 }
+            } else {
+                LOGi("Failed to get next logits for token[%d]", new_token_id);
+                new_token = env->NewStringUTF("");
             }
-        }
-
-        if (cached_token_chars.length() > 8) {  // Increased limit for complex characters
-            LOGi("Cache exceeded maximum size, treating as special character");
-            // Try to handle as a replacement character
-            new_token = env->NewStringUTF("□");  // または "？" や他の適切な代替文字
-            cached_token_chars.clear();
         } else {
+            LOGi("Decode failed for token[%d]", new_token_id);
             new_token = env->NewStringUTF("");
         }
     } else {
-        // Invalid sequence that we can't continue
-        LOGi("Invalid UTF-8 sequence detected, handling as special case");
-        if (!cached_token_chars.empty()) {
-            // Try to output something meaningful or a placeholder
-            new_token = env->NewStringUTF("□");  // または "？" や他の適切な代替文字
-            cached_token_chars.clear();
-        } else {
-            new_token = env->NewStringUTF("");
-        }
+        LOGi("Invalid UTF-8 sequence for token[%d]", new_token_id);
+        new_token = env->NewStringUTF("");
     }
 
-    // Always process the token in the batch
+    // バッチの処理
     llama_batch_clear(*batch);
     llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
-
-    if (llama_decode(context, *batch) != 0) {
-        LOGe("llama_decode() failed on token [%d]", new_token_id);
-    }
-
+    llama_decode(context, *batch);
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
+
     return new_token;
 }
 
