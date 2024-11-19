@@ -275,6 +275,8 @@ Java_com_example_llama_Llm_completion_1loop(
     if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I"); }
     if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V"); }
 
+    static bool skip_next_token = false;  // 次のトークンをスキップするフラグ
+
     // トークンの選択
     auto n_vocab = llama_n_vocab(model);
     auto *logits = llama_get_logits_ith(context, batch->n_tokens - 1);
@@ -287,6 +289,19 @@ Java_com_example_llama_Llm_completion_1loop(
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
     float token_score = candidates[new_token_id].logit;
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
+
+    // トークンスキップの処理
+    if (skip_next_token) {
+        skip_next_token = false;
+        LOGi("Skipping token[%d] as it was used in combination", new_token_id);
+
+        // バッチの処理は必要
+        llama_batch_clear(*batch);
+        llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+        llama_decode(context, *batch);
+        env->CallVoidMethod(intvar_ncur, la_int_var_inc);
+        return env->NewStringUTF("");
+    }
 
     // ログ出力：トークン情報
     LOGi("Token[%d] at position %d/%d (score: %.4f)",
@@ -366,13 +381,26 @@ Java_com_example_llama_Llm_completion_1loop(
                 char next_piece[64] = {0};
                 int next_length = llama_token_to_piece(model, next_token_id, next_piece, sizeof(next_piece), true);
                 if (next_length > 0) {
+                    LOGi("Found continuation token [%d] with length %d", next_token_id, next_length);
+
+                    // Debug: Print continuation token bytes
+                    std::string next_bytes_log = "Continuation bytes: ";
+                    for (int i = 0; i < next_length; i++) {
+                        char hex[8];
+                        snprintf(hex, sizeof(hex), "0x%02X ", (unsigned char)next_piece[i]);
+                        next_bytes_log += hex;
+                    }
+                    LOGi("%s", next_bytes_log.c_str());
+
                     std::string combined = cached_token_chars + std::string(next_piece, next_length);
+                    LOGi("Attempting to combine tokens (total bytes: %zu)", combined.length());
                     if (is_valid_utf8(combined.c_str())) {
                         cached_token_chars = combined;
                         new_token = env->NewStringUTF(cached_token_chars.c_str());
                         LOGi("Tokens[%d,%d] combined -> '%s'",
                              new_token_id, next_token_id, cached_token_chars.c_str());
                         cached_token_chars.clear();
+                        skip_next_token = true;  // 次のトークンをスキップするフラグを設定
                     } else {
                         LOGi("Invalid combination of tokens [%d,%d]", new_token_id, next_token_id);
                         new_token = env->NewStringUTF("");
@@ -390,14 +418,16 @@ Java_com_example_llama_Llm_completion_1loop(
             new_token = env->NewStringUTF("");
         }
     } else {
-        LOGi("Invalid UTF-8 sequence for token[%d]", new_token_id);
+        LOGi("Invalid UTF-8 sequence for token[%d], attempting to continue", new_token_id);
         new_token = env->NewStringUTF("");
     }
 
     // バッチの処理
     llama_batch_clear(*batch);
     llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
-    llama_decode(context, *batch);
+    if (llama_decode(context, *batch) != 0) {
+        LOGi("Warning: Decode failed for token[%d], but continuing", new_token_id);
+    }
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
 
     return new_token;
