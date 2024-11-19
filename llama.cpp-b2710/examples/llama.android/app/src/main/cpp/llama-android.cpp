@@ -287,32 +287,16 @@ Java_com_example_llama_Llm_completion_1loop(
 
     llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
 
-    // トークン選択とそのスコアをログ出力
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
     float token_score = candidates[new_token_id].logit;
 
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
 
-    // EOS token check
-    if (llama_token_is_eog(model, new_token_id)) {
-        char piece[64] = {0};
-        int length = llama_token_to_piece(model, new_token_id, piece, sizeof(piece), true);
-
-        if (length >= 0) {
-            LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d) - EOS token detected",
-                 new_token_id,
-                 piece,
-                 token_score,
-                 n_cur + 1,
-                 n_len);
-        } else {
-            LOGi("Token[%d] '' (score: %.4f, position: %d/%d) - EOS token detected",
-                 new_token_id,
-                 token_score,
-                 n_cur + 1,
-                 n_len);
-        }
-        return env->NewStringUTF("");
+    // Check for EOS token (0) first
+    if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
+        LOGi("EOS token detected (id: %d) at position: %d/%d",
+             new_token_id, n_cur + 1, n_len);
+        return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
 
     // Max tokens check
@@ -321,18 +305,31 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
-    // process tokens
-    jstring new_token;
-    auto new_token_chars = llama_token_to_piece(context, new_token_id);
-    cached_token_chars += new_token_chars;
+    // Get the token piece
+    char piece[64] = {0};
+    int length = llama_token_to_piece(model, new_token_id, piece, sizeof(piece), true);
 
-    if (is_valid_utf8(cached_token_chars.c_str())) {
-        // 改行文字を可視化して表示
+    if (length < 0) {
+        LOGi("Token to piece conversion failed for token [%d], continuing with next token", new_token_id);
+    } else {
+        // Add to cached token chars
+        cached_token_chars += piece;
+        LOGi("Added token [%d] to cache. Current cache: '%s' (hex: ", new_token_id, piece);
+        // Debug: Print hex values of the cached content
+        for (unsigned char c : cached_token_chars) {
+            LOGi("%02X ", c);
+        }
+        LOGi(")");
+    }
+
+    // Process the token(s)
+    jstring new_token;
+    if (is_valid_utf8(cached_token_chars.c_str()) && !cached_token_chars.empty()) {
         std::string display_chars = cached_token_chars;
         if (display_chars == "\n") {
             display_chars = "\\n";
 
-            // バッチの更新とデコードを先に実行
+            // Check for role switch after newline
             llama_batch_clear(*batch);
             llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
 
@@ -340,51 +337,46 @@ Java_com_example_llama_Llm_completion_1loop(
                 LOGe("llama_decode() failed on token [%d]", new_token_id);
             }
 
-            // 次のトークンをプレビューして"User:"のパターンをチェック
-            auto *next_logits = llama_get_logits_ith(context, 0);  // 最後のトークンのlogitsを取得
+            // Preview next token for "User:" pattern
+            auto *next_logits = llama_get_logits_ith(context, 0);
             if (next_logits != nullptr) {
                 std::vector<llama_token_data> next_candidates;
                 next_candidates.reserve(n_vocab);
                 for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                    next_candidates.emplace_back(
-                            llama_token_data{token_id, next_logits[token_id], 0.0f});
+                    next_candidates.emplace_back(llama_token_data{token_id, next_logits[token_id], 0.0f});
                 }
-                llama_token_data_array next_candidates_p = {next_candidates.data(),
-                                                            next_candidates.size(), false};
+                llama_token_data_array next_candidates_p = {next_candidates.data(), next_candidates.size(), false};
                 const auto next_token_id = llama_sample_token_greedy(context, &next_candidates_p);
 
-                auto next_chars = llama_token_to_piece(context, next_token_id);
-                if (next_chars == "User") {
-                    LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
-                         new_token_id, display_chars.c_str(), token_score, n_cur + 1, n_len);
-                    LOGi("Detected role switch - Next predicted token[%d] '%s' (score: %.4f), stopping generation",
-                         next_token_id, next_chars.c_str(), next_logits[next_token_id]);
+                char next_piece[64] = {0};
+                if (llama_token_to_piece(model, next_token_id, next_piece, sizeof(next_piece), true) > 0
+                    && strcmp(next_piece, "User") == 0) {
+                    LOGi("Detected role switch - stopping generation at position: %d/%d", n_cur + 1, n_len);
                     return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
                 }
             }
         }
 
+        // Output the complete UTF-8 character(s)
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("Token[%d] '%s' (score: %.4f, position: %d/%d)",
+        LOGi("Complete UTF-8 sequence found. Token[%d] '%s' (score: %.4f, position: %d/%d)",
              new_token_id, display_chars.c_str(), token_score, n_cur + 1, n_len);
         cached_token_chars.clear();
     } else {
-        LOGi("Invalid UTF-8 sequence detected for token [%d], skipping", new_token_id);
+        // Incomplete or invalid UTF-8 sequence - continue accumulating
+        LOGi("Incomplete/invalid UTF-8 sequence for token [%d], accumulating tokens", new_token_id);
         new_token = env->NewStringUTF("");
     }
 
-    // 改行以外のトークンの場合のバッチ更新
-    if (cached_token_chars != "\n") {
-        llama_batch_clear(*batch);
-        llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+    // Always process the token in the batch
+    llama_batch_clear(*batch);
+    llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
 
-        if (llama_decode(context, *batch) != 0) {
-            LOGe("llama_decode() failed on token [%d]", new_token_id);
-        }
+    if (llama_decode(context, *batch) != 0) {
+        LOGe("llama_decode() failed on token [%d]", new_token_id);
     }
 
     env->CallVoidMethod(intvar_ncur, la_int_var_inc);
-
     return new_token;
 }
 
