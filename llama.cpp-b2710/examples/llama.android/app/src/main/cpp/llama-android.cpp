@@ -163,8 +163,8 @@ extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jint n_tokens,
                                       jint embd, jint n_seq_max) {
-
-    // Source: Copy of llama.cpp:llama_batch_init but heap-allocated.
+    // バッチサイズを2048に固定（モデルの最大コンテキストサイズに合わせる）
+    const size_t batch_size = 2048;
 
     auto *batch = new llama_batch{
             0,
@@ -180,19 +180,60 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
     };
 
     if (embd) {
-        batch->embd = (float *) malloc(sizeof(float) * n_tokens * embd);
+        batch->embd = (float *) malloc(sizeof(float) * batch_size * embd);
     } else {
-        batch->token = (llama_token *) malloc(sizeof(llama_token) * n_tokens);
+        batch->token = (llama_token *) malloc(sizeof(llama_token) * batch_size);
     }
 
-    batch->pos = (llama_pos *) malloc(sizeof(llama_pos) * n_tokens);
-    batch->n_seq_id = (int32_t *) malloc(sizeof(int32_t) * n_tokens);
-    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (n_tokens + 1)); // NOTE: n_tokens + 1
-    for (int i = 0; i < n_tokens; ++i) {
-        batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
+    batch->pos = (llama_pos *) malloc(sizeof(llama_pos) * batch_size);
+    batch->n_seq_id = (int32_t *) malloc(sizeof(int32_t) * batch_size);
+    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (batch_size + 1));
+
+    // メモリ確保エラーチェック
+    if (!batch->pos || !batch->n_seq_id || !batch->seq_id ||
+        (!batch->embd && !batch->token)) {
+        // エラー時の解放処理
+        free(batch->embd);
+        free(batch->token);
+        free(batch->pos);
+        free(batch->n_seq_id);
+        free(batch->seq_id);
+        delete batch;
+        return 0;
     }
-    batch->seq_id[n_tokens] = nullptr; // NOTE: Add this line
-    batch->logits = (int8_t *) malloc(sizeof(int8_t) * n_tokens);
+
+    for (int i = 0; i < batch_size; ++i) {
+        batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
+        if (!batch->seq_id[i]) {
+            // エラー時は既に確保したメモリを解放
+            for (int j = 0; j < i; ++j) {
+                free(batch->seq_id[j]);
+            }
+            free(batch->embd);
+            free(batch->token);
+            free(batch->pos);
+            free(batch->n_seq_id);
+            free(batch->seq_id);
+            delete batch;
+            return 0;
+        }
+    }
+    batch->seq_id[batch_size] = nullptr;
+    batch->logits = (int8_t *) malloc(sizeof(int8_t) * batch_size);
+
+    if (!batch->logits) {
+        // logitsのメモリ確保失敗時の処理
+        for (int i = 0; i < batch_size; ++i) {
+            free(batch->seq_id[i]);
+        }
+        free(batch->embd);
+        free(batch->token);
+        free(batch->pos);
+        free(batch->n_seq_id);
+        free(batch->seq_id);
+        delete batch;
+        return 0;
+    }
 
     return reinterpret_cast<jlong>(batch);
 }

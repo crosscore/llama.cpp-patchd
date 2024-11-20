@@ -106,24 +106,28 @@ class Llm {
                 if (context == 0L) throw IllegalStateException("new_context() failed")
 
                 try {
-                    val batch = new_batch(512, 0, 1)
+                    // 2048トークンに対応できるバッチを作成
+                    val batch = new_batch(2048, 0, 1)
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
-                    val ncur = IntVar(completion_init(context, batch, message, nLen))
-                    while (true) {
-                        currentCoroutineContext().ensureActive()
+                    try {
+                        val ncur = IntVar(completion_init(context, batch, message, nLen))
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
 
-                        val str = completion_loop(context, batch, nLen, ncur)
-                        if (str.isNullOrEmpty() || str == "<EOS_TOKEN_DETECTED>") {
-                            break
-                        } else if (str == "<MAX_TOKENS_REACHED>") {
-                            throw MaxTokensReachedException()
-                        } else {
-                            emit(str)
+                            val str = completion_loop(context, batch, nLen, ncur)
+                            if (str.isNullOrEmpty() || str == "<EOS_TOKEN_DETECTED>") {
+                                break
+                            } else if (str == "<MAX_TOKENS_REACHED>") {
+                                throw MaxTokensReachedException()
+                            } else {
+                                emit(str)
+                            }
                         }
+                        kv_cache_clear(context)
+                    } finally {
+                        free_batch(batch)
                     }
-                    kv_cache_clear(context)
-                    free_batch(batch)
                 } finally {
                     free_context(context)
                 }
