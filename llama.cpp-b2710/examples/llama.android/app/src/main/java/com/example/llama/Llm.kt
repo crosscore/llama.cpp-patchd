@@ -97,7 +97,7 @@ class Llm {
         threadLocalState.set(State.Loaded(model, context))
     }.flowOn(runLoop)
 
-    class MaxTokensReachedException : Exception("Max tokens limit reached")
+    class MaxTokensReachedException : Exception("Maximum output tokens limit reached")
 
     // Helper function to count tokens
     private external fun llama_tokenize(model: Long, text: String): IntArray
@@ -112,10 +112,10 @@ class Llm {
                 // 利用可能なトークン数をチェック
                 if (inputTokenCount + nLen > n_ctx) {
                     throw IllegalArgumentException(
-                        "Total tokens (${inputTokenCount + nLen}) would exceed context size ($n_ctx). " +
+                        "Total tokens would exceed context size ($n_ctx). " +
                             "Input tokens: $inputTokenCount, " +
-                            "Max output tokens requested: $nLen, " +
-                            "Maximum allowed output tokens: ${n_ctx - inputTokenCount}"
+                            "Requested output tokens: $nLen, " +
+                            "Available tokens for output: ${n_ctx - inputTokenCount}"
                     )
                 }
 

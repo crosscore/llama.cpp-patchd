@@ -250,6 +250,9 @@ Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject /*unused*/) {
     return env->NewStringUTF(llama_print_system_info());
 }
 
+// グローバル変数として追加
+static int g_input_token_count = 0;
+
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_llama_Llm_completion_1init(
@@ -264,18 +267,26 @@ Java_com_example_llama_Llm_completion_1init(
 
     const auto *const text = env->GetStringUTFChars(jtext, nullptr);
     auto *const context = reinterpret_cast<llama_context *>(context_pointer);
-    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT(*-no-int-to-ptr)
+    auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
     llama_get_model(context);
 
     LOGi("=== Prompt Analysis ===");
-    LOGi("Input text: %s", text);
+    // テキストの短縮表示
+    std::string display_text = text;
+    if (display_text.length() > 100) {
+        display_text = display_text.substr(0, 97) + "...";
+    }
+    LOGi("Input text: %s", display_text.c_str());
 
     const auto tokens_list = llama_tokenize(context, text, true);
 
-    LOGi("Total tokens: %zu", tokens_list.size());
+    // 入力トークン数を保存
+    g_input_token_count = tokens_list.size();
+
+    LOGi("Total tokens: %zu", g_input_token_count);
 
     auto n_ctx = llama_n_ctx(context);
-    auto n_kv_req = tokens_list.size() + (n_len - tokens_list.size());
+    auto n_kv_req = g_input_token_count + n_len;
 
     if (n_kv_req > n_ctx) {
         LOGe("Error: Required KV cache size (%zu) exceeds context size (%d)", n_kv_req, n_ctx);
@@ -330,6 +341,8 @@ Java_com_example_llama_Llm_completion_1loop(
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
     float token_score = candidates[new_token_id].logit;
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
+    const auto start_pos = n_cur - g_input_token_count;  // グローバル変数を使用
+
 
     // トークンスキップの処理
     if (skip_next_token) {
@@ -346,16 +359,16 @@ Java_com_example_llama_Llm_completion_1loop(
 
     // ログ出力：トークン情報
     LOGi("Token[%d] at position %d/%d (score: %.4f)",
-         new_token_id, n_cur + 1, n_len, token_score);
+         new_token_id, start_pos + 1, n_len, token_score);
 
     // 基本的なチェック
     if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
         LOGi("EOS/EOG token detected (id: %d) at position: %d/%d",
-             new_token_id, n_cur + 1, n_len);
+             new_token_id, start_pos + 1, n_len);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
-    if (n_cur >= n_len) {
-        LOGi("Max tokens reached: %d/%d", n_cur, n_len);
+    if (start_pos >= n_len) {  // 相対位置でチェック
+        LOGi("Max tokens reached: %d/%d", start_pos, n_len);
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
