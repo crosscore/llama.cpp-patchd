@@ -486,3 +486,21 @@ Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unuse
 #endif
 
 #pragma clang diagnostic pop
+
+extern "C"
+JNIEXPORT jintArray JNICALL
+Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlong model, jstring text) {
+    const char *input = env->GetStringUTFChars(text, nullptr);
+    auto *model_ptr = reinterpret_cast<llama_model *>(model);
+
+    std::vector<llama_token> tokens = llama_tokenize(model_ptr, input, true);
+
+    env->ReleaseStringUTFChars(text, input);
+
+    jintArray result = env->NewIntArray(tokens.size());
+    if (result) {
+        env->SetIntArrayRegion(result, 0, tokens.size(), reinterpret_cast<const jint*>(tokens.data()));
+    }
+
+    return result;
+}

@@ -73,7 +73,8 @@ class MainViewModel(
     }
 
     fun updateMaxTokens(newMaxTokens: String) {
-        maxTokens = newMaxTokens.toIntOrNull() ?: 1024
+        val requestedTokens = newMaxTokens.toIntOrNull() ?: 1024
+        maxTokens = minOf(requestedTokens, contextSize)
     }
 
     fun updateSeed(newSeed: String) {
@@ -81,7 +82,11 @@ class MainViewModel(
     }
 
     fun updateContextSize(newContextSize: String) {
-        contextSize = newContextSize.toIntOrNull() ?: 2048
+        val requestedSize = newContextSize.toIntOrNull() ?: 2048
+        // 2048を超えないようにする
+        contextSize = minOf(requestedSize, 2048)
+        // MaxTokensも調整する必要がある場合
+        maxTokens = minOf(maxTokens, contextSize)
     }
 
     fun updateNumThreads(newNumThreads: String) {

@@ -99,14 +99,30 @@ class Llm {
 
     class MaxTokensReachedException : Exception("Max tokens limit reached")
 
+    // Helper function to count tokens
+    private external fun llama_tokenize(model: Long, text: String): IntArray
+
     suspend fun send(message: String, nLen: Int, seed: Int, n_ctx: Int, n_threads: Int): Flow<String> = flow {
         when (val state = threadLocalState.get()) {
             is State.Loaded -> {
+                // メッセージのトークン数を取得
+                val tokens = llama_tokenize(state.model, message)
+                val inputTokenCount = tokens.size
+
+                // 利用可能なトークン数をチェック
+                if (inputTokenCount + nLen > n_ctx) {
+                    throw IllegalArgumentException(
+                        "Total tokens (${inputTokenCount + nLen}) would exceed context size ($n_ctx). " +
+                            "Input tokens: $inputTokenCount, " +
+                            "Max output tokens requested: $nLen, " +
+                            "Maximum allowed output tokens: ${n_ctx - inputTokenCount}"
+                    )
+                }
+
                 val context = new_context(state.model, seed, n_ctx, n_threads)
                 if (context == 0L) throw IllegalStateException("new_context() failed")
 
                 try {
-                    // 2048トークンに対応できるバッチを作成
                     val batch = new_batch(2048, 0, 1)
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
