@@ -29,7 +29,7 @@ class MainViewModel(
     var currentModelPath: String? by mutableStateOf(null)
         private set
 
-    var maxTokens by mutableIntStateOf(1024)
+    var maxTokens by mutableIntStateOf(512)
         private set
 
     var seed by mutableIntStateOf(42)
@@ -73,7 +73,7 @@ class MainViewModel(
     }
 
     fun updateMaxTokens(newMaxTokens: String) {
-        val requestedTokens = newMaxTokens.toIntOrNull() ?: 1024
+        val requestedTokens = newMaxTokens.toIntOrNull() ?: 512
         maxTokens = minOf(requestedTokens, contextSize)
     }
 
