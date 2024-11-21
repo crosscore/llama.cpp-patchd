@@ -85,7 +85,6 @@ class MainViewModel(
         val requestedSize = newContextSize.toIntOrNull() ?: 2048
         // 2048を超えないようにする
         contextSize = minOf(requestedSize, 2048)
-        // MaxTokensも調整する必要がある場合
         maxTokens = minOf(maxTokens, contextSize)
     }
 

@@ -28,6 +28,22 @@ namespace {
     }
 }
 
+// グローバル変数の追加
+static int g_input_token_count = 0;
+static int g_total_tokens = 0;
+static int g_context_size = 0;
+
+// 追加: コンテキストサイズと累積トークン数をリセット
+static void reset_token_tracking(int context_size) {
+    g_total_tokens = 0;
+    g_context_size = context_size;
+}
+
+// 追加: 累積トークン数を更新
+static void update_total_tokens(int new_tokens) {
+    g_total_tokens += new_tokens;
+}
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -104,7 +120,7 @@ Java_com_example_llama_Llm_free_1model(JNIEnv * /*unused*/, jobject /*unused*/, 
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel, jint seed, jint n_ctx, jint n_threads) {
-    auto *model = reinterpret_cast<llama_model *>(jmodel); // NOLINT(*-no-int-to-ptr)
+    auto *model = reinterpret_cast<llama_model *>(jmodel);
 
     if (!model) {
         LOGe("new_context(): model cannot be null");
@@ -119,6 +135,9 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong j
     ctx_params.n_ctx = n_ctx;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
+
+    // トークン追跡をリセット
+    reset_token_tracking(n_ctx);
 
     llama_context *context = llama_new_context_with_model(model, ctx_params);
 
@@ -250,9 +269,6 @@ Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject /*unused*/) {
     return env->NewStringUTF(llama_print_system_info());
 }
 
-// グローバル変数として追加
-static int g_input_token_count = 0;
-
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_example_llama_Llm_completion_1init(
@@ -271,22 +287,24 @@ Java_com_example_llama_Llm_completion_1init(
     llama_get_model(context);
 
     LOGi("=== Prompt Analysis ===");
-    // テキストの短縮表示
     std::string display_text = text;
-    if (display_text.length() > 100) {
-        display_text = display_text.substr(0, 97) + "...";
+    if (display_text.length() > 300) {
+        display_text = display_text.substr(0, 297) + "...";
     }
     LOGi("Input text: %s", display_text.c_str());
 
     const auto tokens_list = llama_tokenize(context, text, true);
+    const auto input_tokens = tokens_list.size();
 
-    // 入力トークン数を保存
-    g_input_token_count = tokens_list.size();
+    // 入力トークンを累積数に追加
+    update_total_tokens(input_tokens);
 
-    LOGi("Total tokens: %zu", g_input_token_count);
+    LOGi("Input tokens: %zu, Total tokens: %d/%d (%.1f%% used)",
+         input_tokens, g_total_tokens, g_context_size,
+         (g_total_tokens * 100.0f) / g_context_size);
 
     auto n_ctx = llama_n_ctx(context);
-    auto n_kv_req = g_input_token_count + n_len;
+    auto n_kv_req = input_tokens + n_len;
 
     if (n_kv_req > n_ctx) {
         LOGe("Error: Required KV cache size (%zu) exceeds context size (%d)", n_kv_req, n_ctx);
@@ -327,29 +345,29 @@ Java_com_example_llama_Llm_completion_1loop(
     if (!la_int_var_value) { la_int_var_value = env->GetMethodID(la_int_var, "getValue", "()I"); }
     if (!la_int_var_inc) { la_int_var_inc = env->GetMethodID(la_int_var, "inc", "()V"); }
 
-    static bool skip_next_token = false;  // 次のトークンをスキップするフラグ
+    static bool skip_next_token = false;
 
-    // トークンの選択
+    // 先にトークン生成のロジックを実行
     auto n_vocab = llama_n_vocab(model);
     auto *logits = llama_get_logits_ith(context, batch->n_tokens - 1);
     std::vector<llama_token_data> candidates;
     candidates.reserve(n_vocab);
+
     for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
         candidates.emplace_back(llama_token_data{token_id, logits[token_id], 0.0f});
     }
+
     llama_token_data_array candidates_p = {candidates.data(), candidates.size(), false};
     const auto new_token_id = llama_sample_token_greedy(context, &candidates_p);
     float token_score = candidates[new_token_id].logit;
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
-    const auto start_pos = n_cur - g_input_token_count;  // グローバル変数を使用
+    const auto start_pos = n_cur - g_input_token_count;
 
-
-    // トークンスキップの処理
+    // skip_next_tokenの処理を後ろに移動
     if (skip_next_token) {
         skip_next_token = false;
-        LOGi("Skipping token[%d] as it was used in combination", new_token_id);
+        LOGi("Skipping token as it was used in combination");
 
-        // バッチの処理は必要
         llama_batch_clear(*batch);
         llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
         llama_decode(context, *batch);
@@ -357,19 +375,20 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("");
     }
 
-    // ログ出力：トークン情報
-    LOGi("Token[%d] at position %d/%d (score: %.4f)",
-         new_token_id, start_pos + 1, n_len, token_score);
+    // 新しいトークンを累積数に追加
+    update_total_tokens(1);
+
+    LOGi("Token[%d] at position:%d/%d Total tokens:%d/%d (%.1f%% used) (score: %.4f)",
+         new_token_id, start_pos + 1, n_len,
+         g_total_tokens, g_context_size,
+         (g_total_tokens * 100.0f) / g_context_size,
+         token_score);
 
     // 基本的なチェック
     if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
         LOGi("EOS/EOG token detected (id: %d) at position: %d/%d",
              new_token_id, start_pos + 1, n_len);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
-    }
-    if (start_pos >= n_len) {  // 相対位置でチェック
-        LOGi("Max tokens reached: %d/%d", start_pos, n_len);
-        return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
     // トークンからピースへの変換
@@ -384,6 +403,48 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("");
     }
 
+    // 現在のトークンが改行かどうかチェック
+    std::string current_piece(piece, length);
+    bool is_newline = (current_piece == "\n");
+
+    if (is_newline) {
+        // 次のトークンを予測
+        llama_batch_clear(*batch);
+        llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
+        if (llama_decode(context, *batch) == 0) {
+            auto *next_logits = llama_get_logits_ith(context, 0);
+            if (next_logits != nullptr) {
+                std::vector<llama_token_data> next_candidates;
+                next_candidates.reserve(n_vocab);
+                for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
+                    next_candidates.emplace_back(llama_token_data{token_id, next_logits[token_id], 0.0f});
+                }
+                llama_token_data_array next_candidates_p = {next_candidates.data(), next_candidates.size(), false};
+                const auto predicted_next_token = llama_sample_token_greedy(context, &next_candidates_p);
+
+                // 次のトークンの文字列を取得
+                char next_piece[64] = {0};
+                int next_length = llama_token_to_piece(model, predicted_next_token, next_piece, sizeof(next_piece), true);
+                if (next_length > 0) {
+                    std::string next_token_str(next_piece, next_length);
+                    // 次のトークンが"User"かチェック
+                    if (next_token_str == "User") {
+                        LOGi("Token[%d] -> '\\n' (detected User following, ending response)",
+                             new_token_id);
+                        return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
+                    }
+                }
+            }
+        }
+        // "User"が続かない場合は改行を表示
+        LOGi("Token[%d] -> '\\n'", new_token_id);
+    }
+
+    if (start_pos >= n_len) {  // 相対位置でチェック
+        LOGi("Max tokens reached: %d/%d", start_pos, n_len);
+        return env->NewStringUTF("<MAX_TOKENS_REACHED>");
+    }
+
     // ログ出力：バイト情報
     std::string bytes_log = "Bytes: ";
     for (int i = 0; i < length; i++) {
@@ -391,7 +452,7 @@ Java_com_example_llama_Llm_completion_1loop(
         snprintf(hex, sizeof(hex), "0x%02X ", (unsigned char)piece[i]);
         bytes_log += hex;
     }
-    LOGi("Token[%d]: %s", new_token_id, bytes_log.c_str());
+    // LOGi("Token[%d]: %s", new_token_id, bytes_log.c_str());
 
     // UTF-8シーケンスの処理
     cached_token_chars += std::string(piece, length);
@@ -408,8 +469,7 @@ Java_com_example_llama_Llm_completion_1loop(
 
         needs_next_token = cached_token_chars.length() < expected_length;
 
-        LOGi("UTF-8 analysis - Expected: %zu, Current: %zu, Valid: %d, Needs next: %d",
-             expected_length, cached_token_chars.length(), is_valid, needs_next_token);
+        //LOGi("UTF-8 analysis - Expected: %zu, Current: %zu, Valid: %d, Needs next: %d", expected_length, cached_token_chars.length(), is_valid, needs_next_token);
     }
 
     jstring new_token;
