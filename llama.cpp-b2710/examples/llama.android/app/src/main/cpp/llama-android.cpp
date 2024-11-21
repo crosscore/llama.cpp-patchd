@@ -445,7 +445,7 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("<MAX_TOKENS_REACHED>");
     }
 
-    // ログ出力：バイト情報
+    // ログ出力：Bytes情報
     std::string bytes_log = "Bytes: ";
     for (int i = 0; i < length; i++) {
         char hex[8];
