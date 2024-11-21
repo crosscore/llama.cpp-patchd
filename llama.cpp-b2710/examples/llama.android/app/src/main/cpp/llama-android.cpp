@@ -28,20 +28,29 @@ namespace {
     }
 }
 
-// グローバル変数の追加
-static int g_input_token_count = 0;
-static int g_total_tokens = 0;
-static int g_context_size = 0;
+static int g_input_token_count = 0;  // 入力トークン数を保持
+static int g_output_token_count = 0; // 出力トークン数を保持
+static int g_total_tokens = 0;       // 合計トークン数を保持
+static int g_context_size = 0;       // コンテキストサイズを保持
 
-// 追加: コンテキストサイズと累積トークン数をリセット
+// トークン追跡のリセット
 static void reset_token_tracking(int context_size) {
+    g_input_token_count = 0;
+    g_output_token_count = 0;
     g_total_tokens = 0;
     g_context_size = context_size;
 }
 
-// 追加: 累積トークン数を更新
-static void update_total_tokens(int new_tokens) {
-    g_total_tokens += new_tokens;
+// 入力トークン数の設定
+static void set_input_tokens(int count) {
+    g_input_token_count = count;
+    g_total_tokens = g_input_token_count;
+}
+
+// 出力トークンの追加
+static void add_output_token() {
+    g_output_token_count++;
+    g_total_tokens = g_input_token_count + g_output_token_count;
 }
 
 #ifdef __cplusplus
@@ -257,20 +266,17 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
     return reinterpret_cast<jlong>(batch);
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_backend_1init(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_init();
 }
 
-extern "C"
-JNIEXPORT jstring JNICALL
+extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject /*unused*/) {
     return env->NewStringUTF(llama_print_system_info());
 }
 
-extern "C"
-JNIEXPORT jint JNICALL
+extern "C" JNIEXPORT jint JNICALL
 Java_com_example_llama_Llm_completion_1init(
         JNIEnv *env,
         jobject /*unused*/,
@@ -284,7 +290,7 @@ Java_com_example_llama_Llm_completion_1init(
     const auto *const text = env->GetStringUTFChars(jtext, nullptr);
     auto *const context = reinterpret_cast<llama_context *>(context_pointer);
     auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
-    llama_get_model(context);
+    auto *const model = llama_get_model(context);
 
     LOGi("=== Prompt Analysis ===");
     std::string display_text = text;
@@ -294,17 +300,14 @@ Java_com_example_llama_Llm_completion_1init(
     LOGi("Input text: %s", display_text.c_str());
 
     const auto tokens_list = llama_tokenize(context, text, true);
-    const auto input_tokens = tokens_list.size();
-
-    // 入力トークンを累積数に追加
-    update_total_tokens(input_tokens);
+    set_input_tokens(tokens_list.size());  // 入力トークン数を設定
 
     LOGi("Input tokens: %zu, Total tokens: %d/%d (%.1f%% used)",
-         input_tokens, g_total_tokens, g_context_size,
+         g_input_token_count, g_total_tokens, g_context_size,
          (g_total_tokens * 100.0f) / g_context_size);
 
     auto n_ctx = llama_n_ctx(context);
-    auto n_kv_req = input_tokens + n_len;
+    auto n_kv_req = g_input_token_count + n_len;
 
     if (n_kv_req > n_ctx) {
         LOGe("Error: Required KV cache size (%zu) exceeds context size (%d)", n_kv_req, n_ctx);
@@ -327,8 +330,7 @@ Java_com_example_llama_Llm_completion_1init(
     return batch->n_tokens;
 }
 
-extern "C"
-JNIEXPORT jstring JNICALL
+extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_completion_1loop(
         JNIEnv *env,
         jobject /*unused*/,
@@ -375,18 +377,19 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("");
     }
 
-    // 新しいトークンを累積数に追加
-    update_total_tokens(1);
+    // トークンの生成と位置のログ出力
+    add_output_token();  // 出力トークンをカウント
+    const auto output_position = g_output_token_count;  // 現在の出力位置
 
-    LOGi("Token[%d] at position:%d/%d Total tokens:%d/%d (%.1f%% used) (score: %.4f)",
-         new_token_id, start_pos + 1, n_len,
+    LOGi("Token[%d] at position:%d/%d totalTokens:%d/%d (%.1f%% used) (score: %.4f)",
+         new_token_id, output_position, n_len,
          g_total_tokens, g_context_size,
          (g_total_tokens * 100.0f) / g_context_size,
          token_score);
 
     // 基本的なチェック
     if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
-        LOGi("EOS/EOG token detected (id: %d) at position: %d/%d",
+        LOGi("EOS token detected (id: %d) at position: %d/%d",
              new_token_id, start_pos + 1, n_len);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
