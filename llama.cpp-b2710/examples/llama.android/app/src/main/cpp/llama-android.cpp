@@ -238,7 +238,7 @@ Java_com_example_llama_Llm_new_1batch(
         free(batch->token);
         free(batch->pos);
         free(batch->n_seq_id);
-        free(batch->seq_id);
+        free(reinterpret_cast<void*>(batch->seq_id));
         delete batch;
         return 0;
     }
@@ -254,7 +254,7 @@ Java_com_example_llama_Llm_new_1batch(
             free(batch->token);
             free(batch->pos);
             free(batch->n_seq_id);
-            free(batch->seq_id);
+            free(reinterpret_cast<void*>(batch->seq_id));
             delete batch;
             return 0;
         }
@@ -271,7 +271,7 @@ Java_com_example_llama_Llm_new_1batch(
         free(batch->token);
         free(batch->pos);
         free(batch->n_seq_id);
-        free(batch->seq_id);
+        free(reinterpret_cast<void*>(batch->seq_id));
         delete batch;
         return 0;
     }
@@ -303,7 +303,7 @@ Java_com_example_llama_Llm_completion_1init(
     const auto *const text = env->GetStringUTFChars(jtext, nullptr);
     auto *const context = reinterpret_cast<llama_context *>(context_pointer);
     auto *const batch = reinterpret_cast<llama_batch *>(batch_pointer);
-    auto *const model = llama_get_model(context);
+    // auto *const model = llama_get_model(context);
 
     LOGi("=== Prompt Analysis ===");
     std::string display_text = text;
@@ -313,7 +313,7 @@ Java_com_example_llama_Llm_completion_1init(
     LOGi("Input text: %s", display_text.c_str());
 
     const auto tokens_list = llama_tokenize(context, text, true);
-    set_input_tokens(tokens_list.size());  // 入力トークン数を設定
+    set_input_tokens(static_cast<int>(tokens_list.size()));  // 入力トークン数を設定
 
     LOGi("Input tokens: %zu, Total tokens: %d/%d (%.1f%% used)",
          g_input_token_count, g_total_tokens, g_context_size,
@@ -587,9 +587,9 @@ Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlon
 
     env->ReleaseStringUTFChars(text, input);
 
-    jintArray result = env->NewIntArray(tokens.size());
+    jintArray result = env->NewIntArray(static_cast<int>(tokens.size()));
     if (result) {
-        env->SetIntArrayRegion(result, 0, tokens.size(), reinterpret_cast<const jint*>(tokens.data()));
+        env->SetIntArrayRegion(result, 0, static_cast<int>(tokens.size()), reinterpret_cast<const jint*>(tokens.data()));
     }
 
     return result;
