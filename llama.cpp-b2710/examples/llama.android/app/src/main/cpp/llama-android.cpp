@@ -182,15 +182,59 @@ extern "C"
 JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
                                        jlong batch_pointer) {
-    auto *batch = reinterpret_cast<llama_batch *>(batch_pointer); // NOLINT
-    llama_batch_free(*batch);
+    auto *batch = reinterpret_cast<llama_batch *>(batch_pointer);
+    if (!batch) {
+        return;
+    }
+
+    // Free embd or token
+    if (batch->embd) {
+        free(batch->embd);
+        batch->embd = nullptr;
+    }
+    if (batch->token) {
+        free(batch->token);
+        batch->token = nullptr;
+    }
+
+    // Free pos
+    if (batch->pos) {
+        free(batch->pos);
+        batch->pos = nullptr;
+    }
+
+    // Free n_seq_id
+    if (batch->n_seq_id) {
+        free(batch->n_seq_id);
+        batch->n_seq_id = nullptr;
+    }
+
+    // Free seq_id
+    if (batch->seq_id) {
+        size_t i = 0;
+        while (batch->seq_id[i] != nullptr) {
+            free(batch->seq_id[i]);
+            i++;
+        }
+        free(reinterpret_cast<void*>(batch->seq_id)); // 正しいポインタ型で解放
+
+        batch->seq_id = nullptr;
+    }
+
+    // Free logits
+    if (batch->logits) {
+        free(batch->logits);
+        batch->logits = nullptr;
+    }
+
+    // Free the batch itself
     delete batch;
 }
 
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(
-        JNIEnv * /*env*/,
+        JNIEnv *env,
         jobject /*thiz*/,
         jlong context_pointer,  // コンテキストポインターを追加
         jint /*n_tokens*/,
@@ -220,59 +264,49 @@ Java_com_example_llama_Llm_new_1batch(
             0,
     };
 
-    if (embd) {
-        batch->embd = (float *) malloc(sizeof(float) * batch_size * embd);
-    } else {
-        batch->token = (llama_token *) malloc(sizeof(llama_token) * batch_size);
-    }
-
-    batch->pos = (llama_pos *) malloc(sizeof(llama_pos) * batch_size);
-    batch->n_seq_id = (int32_t *) malloc(sizeof(int32_t) * batch_size);
-    batch->seq_id = (llama_seq_id **) malloc(sizeof(llama_seq_id *) * (batch_size + 1));
-
-    // メモリ確保エラーチェック
-    if (!batch->pos || !batch->n_seq_id || !batch->seq_id ||
-        (!batch->embd && !batch->token)) {
-        // エラー時の解放処理
-        free(batch->embd);
-        free(batch->token);
-        free(batch->pos);
-        free(batch->n_seq_id);
-        free(reinterpret_cast<void*>(batch->seq_id));
-        delete batch;
-        return 0;
-    }
-
-    for (size_t i = 0; i < batch_size; ++i) {
-        batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
-        if (!batch->seq_id[i]) {
-            // エラー時は既に確保したメモリを解放
-            for (size_t j = 0; j < i; ++j) {
-                free(batch->seq_id[j]);
-            }
-            free(batch->embd);
-            free(batch->token);
-            free(batch->pos);
-            free(batch->n_seq_id);
-            free(reinterpret_cast<void*>(batch->seq_id));
-            delete batch;
-            return 0;
+    try {
+        if (embd) {
+            batch->embd = static_cast<float *>(malloc(sizeof(float) * batch_size * embd));
+            if (!batch->embd) { throw std::bad_alloc(); }
+        } else {
+            batch->token = static_cast<llama_token *>(malloc(sizeof(llama_token) * batch_size));
+            if (!batch->token) { throw std::bad_alloc(); }
         }
-    }
-    batch->seq_id[batch_size] = nullptr;
-    batch->logits = (int8_t *) malloc(sizeof(int8_t) * batch_size);
 
-    if (!batch->logits) {
-        // logitsのメモリ確保失敗時の処理
+        batch->pos = static_cast<llama_pos *>(malloc(sizeof(llama_pos) * batch_size));
+        if (!batch->pos) { throw std::bad_alloc(); }
+
+        batch->n_seq_id = static_cast<int32_t *>(malloc(sizeof(int32_t) * batch_size));
+        if (!batch->n_seq_id) { throw std::bad_alloc(); }
+
+        batch->seq_id = static_cast<llama_seq_id **>(malloc(sizeof(llama_seq_id *) * (batch_size + 1)));
+        if (!batch->seq_id) { throw std::bad_alloc(); }
+
         for (size_t i = 0; i < batch_size; ++i) {
-            free(batch->seq_id[i]);
+            batch->seq_id[i] = static_cast<llama_seq_id *>(malloc(sizeof(llama_seq_id) * n_seq_max));
+            if (!batch->seq_id[i]) { throw std::bad_alloc(); }
         }
-        free(batch->embd);
-        free(batch->token);
-        free(batch->pos);
-        free(batch->n_seq_id);
-        free(reinterpret_cast<void*>(batch->seq_id));
+        batch->seq_id[batch_size] = nullptr;
+
+        batch->logits = static_cast<int8_t *>(malloc(sizeof(int8_t) * batch_size));
+        if (!batch->logits) { throw std::bad_alloc(); }
+    } catch (const std::bad_alloc &) {
+        // エラー時は既に確保したメモリを解放
+        if (batch->embd) { free(batch->embd); }
+        if (batch->token) { free(batch->token); }
+        if (batch->pos) { free(batch->pos); }
+        if (batch->n_seq_id) { free(batch->n_seq_id); }
+        if (batch->seq_id) {
+            for (size_t i = 0; i < batch_size; ++i) {
+                if (batch->seq_id[i]) {
+                    free(batch->seq_id[i]);
+                }
+            }
+            free(reinterpret_cast<void*>(batch->seq_id)); // 正しいポインタ型で解放
+        }
+        if (batch->logits) { free(batch->logits); }
         delete batch;
+        env->ThrowNew(env->FindClass("java/lang/OutOfMemoryError"), "Failed to allocate memory for batch");
         return 0;
     }
 
@@ -489,7 +523,7 @@ Java_com_example_llama_Llm_completion_1loop(
         //LOGi("UTF-8 analysis - Expected: %zu, Current: %zu, Valid: %d, Needs next: %d", expected_length, cached_token_chars.length(), is_valid, needs_next_token);
     }
 
-    jstring new_token;
+    jstring new_token = nullptr;
     if (is_valid && !needs_next_token) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
         LOGi("Token[%d] -> '%s'", new_token_id, cached_token_chars.c_str());
@@ -540,9 +574,6 @@ Java_com_example_llama_Llm_completion_1loop(
                     LOGi("Next token[%d] conversion failed", next_token_id);
                     new_token = env->NewStringUTF("");
                 }
-            } else {
-                LOGi("Failed to get next logits for token[%d]", new_token_id);
-                new_token = env->NewStringUTF("");
             }
         } else {
             LOGi("Decode failed for token[%d]", new_token_id);
@@ -564,8 +595,7 @@ Java_com_example_llama_Llm_completion_1loop(
     return new_token;
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unused*/,
                                             jlong context) {
     llama_kv_cache_clear(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
