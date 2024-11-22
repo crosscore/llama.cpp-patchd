@@ -77,7 +77,7 @@ class Llm {
         ncur: IntVar
     ): String?
 
-    external fun kv_cache_clear(context: Long)
+    private external fun kv_cache_clear(context: Long)
 
     private external fun new_context(model: Long, seed: Int, n_ctx: Int, n_threads: Int): Long
 
@@ -134,7 +134,6 @@ class Llm {
                         0,       // embd
                         1        // nSeqMax
                     )
-                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                     try {
