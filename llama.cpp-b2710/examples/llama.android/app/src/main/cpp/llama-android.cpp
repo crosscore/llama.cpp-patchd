@@ -190,10 +190,10 @@ Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(
-        JNIEnv *env /*unused*/,
-        jobject /*unused*/,
+        JNIEnv * /*env*/,
+        jobject /*thiz*/,
         jlong context_pointer,  // コンテキストポインターを追加
-        jint n_tokens, /*unused*/
+        jint /*n_tokens*/,
         jint embd,
         jint n_seq_max          // n_seq_maxパラメータを追加
 ) {
