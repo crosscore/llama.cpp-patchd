@@ -27,31 +27,30 @@ namespace {
             __android_log_print(ANDROID_LOG_DEFAULT, TAG, fmt, data);
         }
     }
-}
+    int g_input_token_count = 0;  // 入力トークン数を保持
+    int g_output_token_count = 0; // 出力トークン数を保持
+    int g_total_tokens = 0;       // 合計トークン数を保持
+    int g_context_size = 0;       // コンテキストサイズを保持
 
-static int g_input_token_count = 0;  // 入力トークン数を保持
-static int g_output_token_count = 0; // 出力トークン数を保持
-static int g_total_tokens = 0;       // 合計トークン数を保持
-static int g_context_size = 0;       // コンテキストサイズを保持
+    // トークン追跡のリセット
+    void reset_token_tracking(int context_size) {
+        g_input_token_count = 0;
+        g_output_token_count = 0;
+        g_total_tokens = 0;
+        g_context_size = context_size;
+    }
 
-// トークン追跡のリセット
-static void reset_token_tracking(int context_size) {
-    g_input_token_count = 0;
-    g_output_token_count = 0;
-    g_total_tokens = 0;
-    g_context_size = context_size;
-}
+    // 入力トークン数の設定
+    void set_input_tokens(int count) {
+        g_input_token_count = count;
+        g_total_tokens = g_input_token_count;
+    }
 
-// 入力トークン数の設定
-static void set_input_tokens(int count) {
-    g_input_token_count = count;
-    g_total_tokens = g_input_token_count;
-}
-
-// 出力トークンの追加
-static void add_output_token() {
-    g_output_token_count++;
-    g_total_tokens = g_input_token_count + g_output_token_count;
+    // 出力トークンの追加
+    void add_output_token() {
+        g_output_token_count++;
+        g_total_tokens = g_input_token_count + g_output_token_count;
+    }
 }
 
 #ifdef __cplusplus
@@ -191,10 +190,10 @@ Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
 extern "C"
 JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(
-        JNIEnv *env,
+        JNIEnv *env /*unused*/,
         jobject /*unused*/,
         jlong context_pointer,  // コンテキストポインターを追加
-        jint n_tokens,
+        jint n_tokens, /*unused*/
         jint embd,
         jint n_seq_max          // n_seq_maxパラメータを追加
 ) {
@@ -479,10 +478,11 @@ Java_com_example_llama_Llm_completion_1loop(
     if (!cached_token_chars.empty()) {
         unsigned char first_byte = cached_token_chars[0];
         size_t expected_length = 0;
-        if ((first_byte & 0x80) == 0) expected_length = 1;
-        else if ((first_byte & 0xE0) == 0xC0) expected_length = 2;
-        else if ((first_byte & 0xF0) == 0xE0) expected_length = 3;
-        else if ((first_byte & 0xF8) == 0xF0) expected_length = 4;
+        if ((first_byte & 0x80) == 0) { expected_length = 1;
+        } else if ((first_byte & 0xE0) == 0xC0) { expected_length = 2;
+        } else if ((first_byte & 0xF0) == 0xE0) { expected_length = 3;
+        } else if ((first_byte & 0xF8) == 0xF0) { expected_length = 4;
+        }
 
         needs_next_token = cached_token_chars.length() < expected_length;
 
@@ -581,7 +581,7 @@ extern "C"
 JNIEXPORT jintArray JNICALL
 Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlong model, jstring text) {
     const char *input = env->GetStringUTFChars(text, nullptr);
-    auto *model_ptr = reinterpret_cast<llama_model *>(model);
+    auto *model_ptr = reinterpret_cast<llama_model *>(model); // NOLINT(*-no-int-to-ptr)
 
     std::vector<llama_token> tokens = llama_tokenize(model_ptr, input, true);
 
