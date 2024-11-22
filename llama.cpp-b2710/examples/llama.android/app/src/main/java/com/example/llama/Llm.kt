@@ -54,7 +54,12 @@ class Llm {
     private external fun backend_init()
     private external fun backend_free()
     private external fun free_batch(batch: Long)
-    private external fun new_batch(nTokens: Int, embd: Int, nSeqMax: Int): Long
+    private external fun new_batch(
+        context: Long,  // コンテキストポインターを追加
+        nTokens: Int,
+        embd: Int,
+        nSeqMax: Int
+    ): Long
 
     private external fun system_info(): String
 
@@ -123,7 +128,13 @@ class Llm {
                 if (context == 0L) throw IllegalStateException("new_context() failed")
 
                 try {
-                    val batch = new_batch(2048, 0, 1)
+                    val batch = new_batch(
+                        context,  // コンテキストポインターを渡す
+                        2048,    // nTokens
+                        0,       // embd
+                        1        // nSeqMax
+                    )
+                    if (batch == 0L) throw IllegalStateException("new_batch() failed")
                     if (batch == 0L) throw IllegalStateException("new_batch() failed")
 
                     try {

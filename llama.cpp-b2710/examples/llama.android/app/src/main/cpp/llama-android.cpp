@@ -13,6 +13,7 @@
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
+#define MAX_CONTEXT_SIZE 8192
 
 namespace {
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
@@ -189,10 +190,23 @@ Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
 
 extern "C"
 JNIEXPORT jlong JNICALL
-Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, jint n_tokens,
-                                      jint embd, jint n_seq_max) {
-    // バッチサイズを2048に固定（モデルの最大コンテキストサイズに合わせる）
-    const size_t batch_size = 2048;
+Java_com_example_llama_Llm_new_1batch(
+        JNIEnv *env,
+        jobject /*unused*/,
+        jlong context_pointer,  // コンテキストポインターを追加
+        jint n_tokens,
+        jint embd,
+        jint n_seq_max          // n_seq_maxパラメータを追加
+) {
+    // コンテキストポインターから現在のコンテキストサイズを取得
+    auto *const context = reinterpret_cast<llama_context *>(context_pointer);
+    const size_t current_context_size = llama_n_ctx(context);
+
+    // 現在のコンテキストサイズに基づいてバッチサイズを設定
+    // ただし最大値を超えないようにする
+    const size_t batch_size = std::min(current_context_size, static_cast<size_t>(MAX_CONTEXT_SIZE));
+
+    LOGi("Creating batch with size: %zu (context size: %zu)", batch_size, current_context_size);
 
     auto *batch = new llama_batch{
             0,
@@ -230,11 +244,11 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
         return 0;
     }
 
-    for (int i = 0; i < batch_size; ++i) {
+    for (size_t i = 0; i < batch_size; ++i) {
         batch->seq_id[i] = (llama_seq_id *) malloc(sizeof(llama_seq_id) * n_seq_max);
         if (!batch->seq_id[i]) {
             // エラー時は既に確保したメモリを解放
-            for (int j = 0; j < i; ++j) {
+            for (size_t j = 0; j < i; ++j) {
                 free(batch->seq_id[j]);
             }
             free(batch->embd);
@@ -251,7 +265,7 @@ Java_com_example_llama_Llm_new_1batch(JNIEnv * /*unused*/, jobject /*unused*/, j
 
     if (!batch->logits) {
         // logitsのメモリ確保失敗時の処理
-        for (int i = 0; i < batch_size; ++i) {
+        for (size_t i = 0; i < batch_size; ++i) {
             free(batch->seq_id[i]);
         }
         free(batch->embd);

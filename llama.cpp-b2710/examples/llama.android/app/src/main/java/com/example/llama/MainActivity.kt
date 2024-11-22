@@ -325,12 +325,12 @@ fun MainCompose(
                 items(viewModel.messages) { (userMessage, assistantResponse) ->
                     Text(
                         text = "User: $userMessage",
-                        color = Color(0xFF90CAF9),
+                        color = Color(0xFFFFFFFF),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Text(
                         text = "Assistant: $assistantResponse",
-                        color = Color(0xFFA5D6A7),
+                        color = Color(0xFFFFFFFF),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
