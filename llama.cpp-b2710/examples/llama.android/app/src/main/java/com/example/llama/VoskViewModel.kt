@@ -1,6 +1,6 @@
 package com.example.llama
 
-import android.annotation.SuppressLint
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -16,24 +16,34 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 
 class VoskViewModel(
-    @SuppressLint("StaticFieldLeak")
-    context: Context,
+    application: Application,
     private val onRecognitionResult: (String) -> Unit
 ) : ViewModel() {
-    private val appContext = context.applicationContext
+    private val appContext = application
     private val voskRecognizer = VoskRecognizer.getInstance(appContext)
     private val audioRecorder = AudioRecorder.getInstance(appContext)
+    private val speakerIdentifier = SpeakerIdentifier.getInstance(appContext)
     private val tag = "VoskViewModel"
 
     // 音声認識の状態
     private var isRecording by mutableStateOf(false)
-
     private var isModelInitialized by mutableStateOf(false)
 
+    // 音声認識の結果
     var currentTranscript by mutableStateOf("")
         private set
 
     var errorMessage by mutableStateOf<String?>(null)
+        private set
+
+    // 話者識別の状態と結果
+    var currentSpeakerId by mutableStateOf<String?>(null)
+        private set
+
+    var currentSpeakerConfidence by mutableStateOf<Float?>(null)
+        private set
+
+    var registeredSpeakers by mutableStateOf(emptyList<String>())
         private set
 
     init {
@@ -48,17 +58,23 @@ class VoskViewModel(
                     if (voskRecognizer.isModelAvailable(modelName)) {
                         isModelInitialized = voskRecognizer.initModel(modelName)
                         if (isModelInitialized) {
-                            Log.i(tag, "Model initialized successfully")
+                            Log.i(tag, "Speech recognition model initialized successfully")
                             setupRecognitionCallbacks()
+                            // 話者識別モデルの初期化
+                            if (speakerIdentifier.initModel()) {
+                                Log.i(tag, "Speaker identification model initialized successfully")
+                            } else {
+                                errorMessage = "Failed to initialize speaker model"
+                            }
                         } else {
-                            errorMessage = "Failed to initialize model"
+                            errorMessage = "Failed to initialize speech recognition model"
                         }
                     } else {
-                        errorMessage = "Model not found"
+                        errorMessage = "Speech recognition model not found"
                     }
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Error initializing model", e)
+                Log.e(tag, "Error initializing models", e)
                 errorMessage = "Error: ${e.message}"
             }
         }
@@ -94,6 +110,13 @@ class VoskViewModel(
             errorMessage = "Recognition error: ${exception.message}"
             stopRecording()
         }
+
+        // 話者識別のコールバック
+        voskRecognizer.onSpeakerIdentified = { speakerId, confidence ->
+            currentSpeakerId = speakerId
+            currentSpeakerConfidence = confidence
+            Log.i(tag, "Speaker identified: $speakerId (confidence: $confidence)")
+        }
     }
 
     fun startRecording() {
@@ -111,14 +134,16 @@ class VoskViewModel(
             try {
                 isRecording = true
                 currentTranscript = ""
+                currentSpeakerId = null
+                currentSpeakerConfidence = null
                 errorMessage = null
 
                 voskRecognizer.startListening()
 
                 audioRecorder.startRecording()
-                    .onEach { _ -> // replace audioData to "_"
-                        // 音声データをVoskに送信
-                        // 必要に応じてここでデータ変換を行う
+                    .onEach { audioData ->
+                        // 音声データをVoskRecognizerに送信
+                        voskRecognizer.addAudioData(audioData)
                     }
                     .catch { e ->
                         Log.e(tag, "Error in audio recording", e)
@@ -137,9 +162,39 @@ class VoskViewModel(
 
     fun stopRecording() {
         if (isRecording) {
-            isRecording = false
+            isRecording = true
             audioRecorder.stopRecording()
             voskRecognizer.stopListening()
+        }
+    }
+
+    /**
+     * 新しい話者を登録
+     */
+    fun registerSpeaker(speakerId: String, speakerName: String, audioData: ShortArray): Boolean {
+        return try {
+            val embedding = speakerIdentifier.extractEmbedding(audioData)
+            if (embedding != null) {
+                speakerIdentifier.registerSpeaker(speakerId, speakerName, embedding)
+                refreshRegisteredSpeakers()
+                true
+            } else {
+                Log.e(tag, "Failed to extract speaker embedding")
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error registering speaker", e)
+            false
+        }
+    }
+
+    /**
+     * 登録済み話者リストの更新
+     */
+    private fun refreshRegisteredSpeakers() {
+        viewModelScope.launch {
+            // TODO: SpeakerIdentifierに登録済み話者リストを取得するメソッドを追加し、
+            // registeredSpeakersを更新する実装を追加
         }
     }
 
@@ -151,17 +206,18 @@ class VoskViewModel(
         super.onCleared()
         stopRecording()
         voskRecognizer.release()
+        speakerIdentifier.release()
     }
 
-    // Factory for creating VoskViewModel with Context
+    // Factory for creating VoskViewModel with Application Context
     class Factory(
-        private val context: Context,
+        private val application: Application,
         private val onRecognitionResult: (String) -> Unit
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(VoskViewModel::class.java)) {
-                return VoskViewModel(context, onRecognitionResult) as T
+                return VoskViewModel(application, onRecognitionResult) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

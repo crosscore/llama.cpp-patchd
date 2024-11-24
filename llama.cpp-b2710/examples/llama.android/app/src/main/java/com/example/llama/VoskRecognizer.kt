@@ -26,7 +26,7 @@ class VoskRecognizer private constructor(private val context: Context) {
     var onPartialResult: ((String) -> Unit)? = null
     var onResult: ((String) -> Unit)? = null
     var onError: ((Exception) -> Unit)? = null
-    private var onSpeakerIdentified: ((String, Float) -> Unit)? = null
+    var onSpeakerIdentified: ((String, Float) -> Unit)? = null
 
     // 音声バッファ（話者識別用）
     private val audioBuffer = mutableListOf<Short>()
