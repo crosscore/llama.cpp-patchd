@@ -18,31 +18,17 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.getSystemService
 import androidx.lifecycle.ViewModel
@@ -61,7 +47,6 @@ class MainActivity : ComponentActivity() {
         MainViewModelFactory()
     }
 
-    // Keep models as a mutable state list
     private val models = mutableStateListOf<Downloadable>()
 
     // 音声認識のパーミッション要求用
@@ -69,8 +54,23 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            // パーミッションが許可された場合の処理
             initializeVoskViewModel()
+        } else {
+            setContent {
+                var showDialog by remember { mutableStateOf(true) }
+                if (showDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDialog = false },
+                        title = { Text("権限が拒否されました") },
+                        text = { Text("音声認識機能を使用するには、設定からマイクの使用を許可してください。") },
+                        confirmButton = {
+                            Button(onClick = { showDialog = false }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
+            }
         }
     }
 
@@ -86,7 +86,6 @@ class MainActivity : ComponentActivity() {
         // 音声認識のパーミッション確認
         checkAudioPermission()
 
-        // Only Logcat
         Log.i(tag, "Current memory: ${
             Formatter.formatFileSize(
                 this,
@@ -158,7 +157,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Set a listener to reload models when an operation completes
         viewModel.onModelOperationCompleted = {
             loadModels()
         }
@@ -170,11 +168,9 @@ class MainActivity : ComponentActivity() {
                 this,
                 Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED -> {
-                // パーミッションがすでに許可されている場合
                 initializeVoskViewModel()
             }
             shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> {
-                // パーミッションが必要な理由を説明する必要がある場合
                 setContent {
                     var showDialog by remember { mutableStateOf(true) }
                     if (showDialog) {
@@ -202,17 +198,15 @@ class MainActivity : ComponentActivity() {
                 }
             }
             else -> {
-                // パーミッションを要求
                 requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
     }
 
     private fun initializeVoskViewModel() {
-        // VoskViewModelの初期化
         viewModel.initializeVosk(
             VoskViewModel.Factory(
-                context = this,
+                application = application,
                 onRecognitionResult = { text ->
                     viewModel.updateMessage(text)
                 }
@@ -226,7 +220,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Function to load or reload the model list
     private fun loadModels() {
         val extFilesDir = getExternalFilesDir(null)
 
@@ -248,15 +241,19 @@ class MainActivity : ComponentActivity() {
                 File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf"),
                 sha256 = "e7effd3e3a3b6f1c05b914deca7c9646210bad34576d39d3c5c5f2a25cb97ae1"
             ),
+            Downloadable(
+                VoskRecognizer.DEFAULT_MODEL_NAME,
+                Uri.parse("https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip"),
+                File(extFilesDir, VoskRecognizer.DEFAULT_MODEL_NAME),
+                sha256 = ""
+            )
         )
 
-        // Update the models list
         models.clear()
         models.addAll(initialModels + downloadedModels)
     }
 }
 
-// Factory to provide Context to the ViewModel
 class MainViewModelFactory : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
@@ -279,17 +276,21 @@ fun MainCompose(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Recording state observer
+    // 既存の状態
     val isRecording = viewModel.isRecording
     val currentVoiceTranscript = viewModel.currentVoiceTranscript
     val voiceError = viewModel.voiceRecognitionError
+
+    // 話者管理用の状態
+    var showSpeakerManagementDialog by remember { mutableStateOf(false) }
+    var showSpeakerRegistrationDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
             .padding(16.dp)
             .verticalScroll(scrollState)
     ) {
-        // ステータスボックス
+        // 既存のステータスボックス
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -311,7 +312,7 @@ fun MainCompose(
             }
         }
 
-        // チャットメッセージ表示エリア
+        // チャットメッセージ表示エリア（既存）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -338,7 +339,7 @@ fun MainCompose(
             }
         }
 
-        // メッセージ入力欄と音声認識中の表示
+        // メッセージ入力欄と音声認識中の表示（既存）
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -351,7 +352,6 @@ fun MainCompose(
                     .padding(vertical = 8.dp)
             )
 
-            // 音声認識中のトランスクリプト表示
             if (isRecording && currentVoiceTranscript.isNotBlank()) {
                 Text(
                     text = "認識中: $currentVoiceTranscript",
@@ -361,7 +361,7 @@ fun MainCompose(
             }
         }
 
-        // パラメータコントロール
+        // パラメータコントロール（既存）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -394,7 +394,7 @@ fun MainCompose(
             )
         }
 
-        // アクションボタン
+        // アクションボタン（既存）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -410,7 +410,7 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        // コントロールボタン行1
+        // コントロールボタン行1（既存＋新規）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -420,9 +420,11 @@ fun MainCompose(
             Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
             Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
             Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
+            // 話者管理ボタンを追加
+            Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
         }
 
-        // コントロールボタン行2
+        // コントロールボタン行2（既存）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -443,7 +445,7 @@ fun MainCompose(
             }
         }
 
-        // 音声入力ボタン行
+        // 音声入力ボタン行（既存）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -469,7 +471,7 @@ fun MainCompose(
             }
         }
 
-        // ダイアログ表示
+        // 既存のダイアログ
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
@@ -487,7 +489,31 @@ fun MainCompose(
             )
         }
 
-        // エラーダイアログ
+        // 話者管理関連のダイアログ
+        if (showSpeakerManagementDialog) {
+            SpeakerManagementDialog(
+                onDismiss = { showSpeakerManagementDialog = false },
+                viewModel = viewModel.voskViewModel ?: return@SpeakerManagementDialog,
+                currentSpeakerId = viewModel.voskViewModel?.currentSpeakerId,
+                currentConfidence = viewModel.voskViewModel?.currentSpeakerConfidence,
+                onRegisterNewSpeaker = {
+                    showSpeakerManagementDialog = false
+                    showSpeakerRegistrationDialog = true
+                }
+            )
+        }
+
+        if (showSpeakerRegistrationDialog) {
+            SpeakerRegistrationDialog(
+                onDismiss = { showSpeakerRegistrationDialog = false },
+                viewModel = viewModel.voskViewModel ?: return@SpeakerRegistrationDialog,
+                isRecording = isRecording,
+                onStartRecording = { viewModel.startVoiceRecording() },
+                onStopRecording = { viewModel.stopVoiceRecording() }
+            )
+        }
+
+        // エラーダイアログ（既存）
         voiceError?.let { error ->
             AlertDialog(
                 onDismissRequest = { viewModel.clearVoiceError() },

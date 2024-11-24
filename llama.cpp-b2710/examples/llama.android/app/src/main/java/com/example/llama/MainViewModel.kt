@@ -60,9 +60,48 @@ class MainViewModel(
     // Callback for when model operations complete
     var onModelOperationCompleted: (() -> Unit)? = null
 
+    // VoskViewModel関連
+    private var _voskViewModel: VoskViewModel? = null
+    val voskViewModel: VoskViewModel?
+        get() = _voskViewModel
+
+    // VoskViewModelの初期化
+    fun initializeVosk(factory: VoskViewModel.Factory) {
+        if (_voskViewModel == null) {
+            _voskViewModel = factory.create(VoskViewModel::class.java)
+            // 音声認識結果のコールバックを設定
+            _voskViewModel?.onRecognitionResult = { text ->
+                updateMessage(text)
+            }
+        }
+    }
+
+    // 音声認識の状態を公開
+    val isRecording: Boolean
+        get() = _voskViewModel?.isRecording ?: false
+
+    val currentVoiceTranscript: String
+        get() = _voskViewModel?.currentTranscript ?: ""
+
+    val voiceRecognitionError: String?
+        get() = _voskViewModel?.errorMessage
+
+    // 音声認識関連のメソッド
+    fun startVoiceRecording() {
+        _voskViewModel?.startRecording()
+    }
+
+    fun stopVoiceRecording() {
+        _voskViewModel?.stopRecording()
+    }
+
+    fun clearVoiceError() {
+        _voskViewModel?.clearError()
+    }
+
     override fun onCleared() {
         super.onCleared()
-        voskViewModel = null
+        _voskViewModel = null
         viewModelScope.launch {
             try {
                 llm.unload()
@@ -117,76 +156,6 @@ class MainViewModel(
             clear()
         }
         log("Chat history ${if (isHistoryEnabled) "enabled" else "disabled"}")
-    }
-
-    // Vosk関連の状態変数を追加
-    var isRecording by mutableStateOf(false)
-        private set
-
-    var currentVoiceTranscript by mutableStateOf("")
-        private set
-
-    var voiceRecognitionError by mutableStateOf<String?>(null)
-        private set
-
-    // 音声認識の結果を処理するコールバック
-    private val onVoiceRecognitionResult: (String) -> Unit = { result ->
-        message = result
-        currentVoiceTranscript = ""  // 認識結果をメッセージ欄に移動したらクリア
-    }
-
-    // VoskViewModelへの参照（遅延初期化）
-    private var voskViewModel: VoskViewModel? = null
-
-    // VoskViewModelの初期化メソッド
-    fun initializeVosk(factory: VoskViewModel.Factory) {
-        if (voskViewModel == null) {
-            voskViewModel = factory.create(VoskViewModel::class.java)
-        }
-    }
-
-    // 音声認識の開始
-    fun startVoiceRecording() {
-        voskViewModel?.let { vosk ->
-            if (!isRecording) {
-                isRecording = true
-                vosk.startRecording()
-                // 現在の認識結果を監視
-                viewModelScope.launch {
-                    snapshotFlow { vosk.currentTranscript }
-                        .collect { transcript ->
-                            currentVoiceTranscript = transcript
-                        }
-                }
-                // エラーを監視
-                viewModelScope.launch {
-                    snapshotFlow { vosk.errorMessage }
-                        .collect { error ->
-                            voiceRecognitionError = error
-                        }
-                }
-            }
-        }
-    }
-
-    // 音声認識の停止
-    fun stopVoiceRecording() {
-        voskViewModel?.let { vosk ->
-            if (isRecording) {
-                vosk.stopRecording()
-                isRecording = false
-                // 最終的な認識結果がある場合はメッセージ欄に設定
-                if (vosk.currentTranscript.isNotBlank()) {
-                    message = vosk.currentTranscript
-                }
-            }
-        }
-    }
-
-    // エラーのクリア
-    fun clearVoiceError() {
-        voiceRecognitionError = null
-        voskViewModel?.clearError()
     }
 
     fun send() {

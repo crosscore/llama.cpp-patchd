@@ -1,7 +1,6 @@
 package com.example.llama
 
 import android.app.Application
-import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -17,7 +16,7 @@ import org.json.JSONObject
 
 class VoskViewModel(
     application: Application,
-    private val onRecognitionResult: (String) -> Unit
+    val onRecognitionResult: (String) -> Unit
 ) : ViewModel() {
     private val appContext = application
     private val voskRecognizer = VoskRecognizer.getInstance(appContext)
@@ -26,7 +25,7 @@ class VoskViewModel(
     private val tag = "VoskViewModel"
 
     // 音声認識の状態
-    private var isRecording by mutableStateOf(false)
+    var isRecording by mutableStateOf(false)
     private var isModelInitialized by mutableStateOf(false)
 
     // 音声認識の結果
