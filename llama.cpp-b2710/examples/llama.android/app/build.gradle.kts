@@ -72,7 +72,6 @@ android {
     }
     composeOptions {
         // kotlinCompilerExtensionVersion を削除
-        // Removed to let the Compose Compiler plugin manage the version
     }
     packaging {
         resources {

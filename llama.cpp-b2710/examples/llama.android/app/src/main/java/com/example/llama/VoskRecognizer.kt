@@ -16,15 +16,21 @@ class VoskRecognizer private constructor(private val context: Context) {
     private var model: Model? = null
     private var speechService: SpeechService? = null
     private var recognizer: Recognizer? = null
+    private var speakerIdentifier: SpeakerIdentifier? = null
 
     // モデルのダウンロード先ディレクトリ
     private val modelDir: File
         get() = context.getExternalFilesDir(null) ?: throw IllegalStateException("External storage is not available")
 
-    // Recognition callback
+    // Recognition callbacks
     var onPartialResult: ((String) -> Unit)? = null
     var onResult: ((String) -> Unit)? = null
     var onError: ((Exception) -> Unit)? = null
+    private var onSpeakerIdentified: ((String, Float) -> Unit)? = null
+
+    // 音声バッファ（話者識別用）
+    private val audioBuffer = mutableListOf<Short>()
+    private val speakerBufferSize = 16000 * 5 // 5秒分のオーディオデータ
 
     private val recognitionListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
@@ -35,9 +41,14 @@ class VoskRecognizer private constructor(private val context: Context) {
         override fun onResult(hypothesis: String) {
             // 最終的な認識結果
             onResult?.invoke(hypothesis)
+
+            // 話者識別の実行
+            if (audioBuffer.size >= speakerBufferSize) {
+                performSpeakerIdentification(audioBuffer.toShortArray())
+                audioBuffer.clear()
+            }
         }
 
-        // 抽象メソッドの実装
         override fun onFinalResult(hypothesis: String) {
             // 最終結果（onResultと同様の処理）
             onResult?.invoke(hypothesis)
@@ -50,6 +61,17 @@ class VoskRecognizer private constructor(private val context: Context) {
 
         override fun onTimeout() {
             Log.w(tag, "Recognition timeout")
+        }
+    }
+
+    /**
+     * 初期化処理
+     */
+    fun initialize() {
+        speakerIdentifier = SpeakerIdentifier.getInstance(context)
+        if (speakerIdentifier?.initModel() != true) {
+            Log.e(tag, "Failed to initialize speaker identification")
+            onError?.invoke(IllegalStateException("Failed to initialize speaker identification"))
         }
     }
 
@@ -77,6 +99,9 @@ class VoskRecognizer private constructor(private val context: Context) {
             // 認識器の初期化
             recognizer = Recognizer(model, 16000.0f)
 
+            // 話者識別の初期化
+            initialize()
+
             Log.i(tag, "Model loaded successfully")
             return true
         } catch (e: IOException) {
@@ -86,6 +111,9 @@ class VoskRecognizer private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 音声認識の開始
+     */
     fun startListening() {
         if (speechService != null) {
             Log.w(tag, "Speech service is already running")
@@ -107,6 +135,9 @@ class VoskRecognizer private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 音声認識の停止
+     */
     fun stopListening() {
         speechService?.let { service ->
             service.stop()
@@ -116,6 +147,54 @@ class VoskRecognizer private constructor(private val context: Context) {
         }
     }
 
+    /**
+     * 音声データの追加と話者識別
+     */
+    fun addAudioData(audioData: ShortArray) {
+        audioBuffer.addAll(audioData.toList())
+
+        // バッファが一定サイズを超えたら話者識別を実行
+        if (audioBuffer.size >= speakerBufferSize) {
+            performSpeakerIdentification(audioBuffer.toShortArray())
+            audioBuffer.clear()
+        }
+    }
+
+    /**
+     * 話者識別の実行
+     */
+    private fun performSpeakerIdentification(audioData: ShortArray) {
+        speakerIdentifier?.let { identifier ->
+            val embedding = identifier.extractEmbedding(audioData)
+            embedding?.let { emb ->
+                identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
+                    onSpeakerIdentified?.invoke(speakerId, score)
+                }
+            }
+        }
+    }
+
+    /**
+     * 新しい話者の登録
+     */
+    fun registerSpeaker(id: String, name: String, audioData: ShortArray): Boolean {
+        return try {
+            speakerIdentifier?.let { identifier ->
+                val embedding = identifier.extractEmbedding(audioData)
+                embedding?.let { emb ->
+                    identifier.registerSpeaker(id, name, emb)
+                    true
+                } ?: false
+            } ?: false
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to register speaker", e)
+            false
+        }
+    }
+
+    /**
+     * リソースの解放
+     */
     fun release() {
         try {
             speechService?.shutdown()
@@ -124,6 +203,9 @@ class VoskRecognizer private constructor(private val context: Context) {
             recognizer = null
             model?.close()
             model = null
+            speakerIdentifier?.release()
+            speakerIdentifier = null
+            audioBuffer.clear()
             Log.i(tag, "Resources released")
         } catch (e: Exception) {
             Log.e(tag, "Error releasing resources", e)
@@ -154,5 +236,7 @@ class VoskRecognizer private constructor(private val context: Context) {
 
         // デフォルトのモデル名
         const val DEFAULT_MODEL_NAME = "vosk-model-small-ja-0.22"
+        // 話者識別モデル名
+        const val SPEAKER_MODEL_NAME = "vosk-model-spk-0.4"
     }
 }
