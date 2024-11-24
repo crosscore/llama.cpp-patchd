@@ -1,6 +1,7 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Dialogs.kt
 package com.example.llama
 
+import android.annotation.SuppressLint
 import android.app.DownloadManager
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.util.*
+import kotlin.text.*
 
 @Composable
 fun ModelDialog(
@@ -84,6 +85,7 @@ fun SystemPromptDialog(
     )
 }
 
+@SuppressLint("DefaultLocale")
 @Composable
 fun SpeakerManagementDialog(
     onDismiss: () -> Unit,
@@ -146,7 +148,7 @@ fun SpeakerManagementDialog(
                                 }
                             }
                         )
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
             }
@@ -232,7 +234,13 @@ fun SpeakerRegistrationDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // TODO: 話者登録の実装
+                    // viewModelを使用して話者登録を実行
+                    viewModel.registerSpeaker(
+                        speakerId,
+                        speakerName,
+                        // TODO: 録音データの取得方法を実装
+                        ShortArray(0)
+                    )
                     onDismiss()
                 },
                 enabled = !isRecording && speakerId.isNotBlank() && speakerName.isNotBlank()

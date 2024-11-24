@@ -491,26 +491,30 @@ fun MainCompose(
 
         // 話者管理関連のダイアログ
         if (showSpeakerManagementDialog) {
-            SpeakerManagementDialog(
-                onDismiss = { showSpeakerManagementDialog = false },
-                viewModel = viewModel.voskViewModel ?: return@SpeakerManagementDialog,
-                currentSpeakerId = viewModel.voskViewModel?.currentSpeakerId,
-                currentConfidence = viewModel.voskViewModel?.currentSpeakerConfidence,
-                onRegisterNewSpeaker = {
-                    showSpeakerManagementDialog = false
-                    showSpeakerRegistrationDialog = true
-                }
-            )
+            viewModel.voskViewModel?.let { voskViewModel ->
+                SpeakerManagementDialog(
+                    onDismiss = { showSpeakerManagementDialog = false },
+                    viewModel = voskViewModel,
+                    currentSpeakerId = voskViewModel.currentSpeakerId,
+                    currentConfidence = voskViewModel.currentSpeakerConfidence,
+                    onRegisterNewSpeaker = {
+                        showSpeakerManagementDialog = false
+                        showSpeakerRegistrationDialog = true
+                    }
+                )
+            }
         }
 
         if (showSpeakerRegistrationDialog) {
-            SpeakerRegistrationDialog(
-                onDismiss = { showSpeakerRegistrationDialog = false },
-                viewModel = viewModel.voskViewModel ?: return@SpeakerRegistrationDialog,
-                isRecording = isRecording,
-                onStartRecording = { viewModel.startVoiceRecording() },
-                onStopRecording = { viewModel.stopVoiceRecording() }
-            )
+            viewModel.voskViewModel?.let { voskViewModel ->
+                SpeakerRegistrationDialog(
+                    onDismiss = { showSpeakerRegistrationDialog = false },
+                    viewModel = voskViewModel,
+                    isRecording = isRecording,
+                    onStartRecording = { viewModel.startVoiceRecording() },
+                    onStopRecording = { viewModel.stopVoiceRecording() }
+                )
+            }
         }
 
         // エラーダイアログ（既存）

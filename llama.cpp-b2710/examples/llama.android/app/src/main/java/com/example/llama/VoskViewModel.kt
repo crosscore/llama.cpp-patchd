@@ -16,7 +16,7 @@ import org.json.JSONObject
 
 class VoskViewModel(
     application: Application,
-    val onRecognitionResult: (String) -> Unit
+    var onRecognitionResult: (String) -> Unit
 ) : ViewModel() {
     private val appContext = application
     private val voskRecognizer = VoskRecognizer.getInstance(appContext)
