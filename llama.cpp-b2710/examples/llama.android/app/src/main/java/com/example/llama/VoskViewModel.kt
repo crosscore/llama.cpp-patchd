@@ -197,7 +197,7 @@ class VoskViewModel(
     }
 
     // 録音データの取得
-    fun getRecordedAudioData(): ShortArray {
+    private fun getRecordedAudioData(): ShortArray {
         return temporaryRecording.toShortArray()
     }
 

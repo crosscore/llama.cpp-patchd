@@ -159,7 +159,7 @@ class SpeakerStorage private constructor(context: Context) {
     /**
      * 特定の話者のメタデータを取得
      */
-    fun getSpeakerMetadata(speakerId: String): SpeakerMetadata? {
+    private fun getSpeakerMetadata(speakerId: String): SpeakerMetadata? {
         return getAllSpeakerMetadata().find { it.id == speakerId }
     }
 
