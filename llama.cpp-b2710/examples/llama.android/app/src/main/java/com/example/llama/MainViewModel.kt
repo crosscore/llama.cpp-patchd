@@ -197,9 +197,21 @@ class MainViewModel(
                         }
                     }
                     .collect { token ->
-                        responseBuilder.append(token)
-                        messages = messages.toMutableList().apply {
-                            this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                        when (token) {
+                            "<CONVERSATION_END>" -> {
+                                log("Conversation ended with double newline")
+                                // 現在の応答を確定
+                                messages = messages.toMutableList().apply {
+                                    this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                                }
+                                return@collect
+                            }
+                            else -> {
+                                responseBuilder.append(token)
+                                messages = messages.toMutableList().apply {
+                                    this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
+                                }
+                            }
                         }
                     }
             } catch (e: CancellationException) {
