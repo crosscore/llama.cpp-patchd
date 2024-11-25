@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.util.Date
 
 class VoskViewModel(
     application: Application,
@@ -118,7 +119,24 @@ class VoskViewModel(
         }
     }
 
-    fun startRecording() {
+    // 録音データの一時保存用
+    private var temporaryRecording = mutableListOf<Short>()
+
+    // 録音モードを companion object の中で定義
+    companion object {
+        enum class RecordingMode {
+            Recognition,
+            Registration
+        }
+    }
+
+    private var currentRecordingMode = RecordingMode.Recognition
+
+    // 話者データのストレージ
+    private val speakerStorage = SpeakerStorage.getInstance(application)
+
+    // 録音開始（モード指定）
+    fun startRecording(mode: RecordingMode = RecordingMode.Recognition) {
         if (!audioRecorder.hasPermission()) {
             errorMessage = "Recording permission not granted"
             return
@@ -132,17 +150,25 @@ class VoskViewModel(
         viewModelScope.launch {
             try {
                 isRecording = true
+                currentRecordingMode = mode
                 currentTranscript = ""
-                currentSpeakerId = null
-                currentSpeakerConfidence = null
                 errorMessage = null
+                temporaryRecording.clear()
 
-                voskRecognizer.startListening()
+                if (mode == RecordingMode.Recognition) {
+                    voskRecognizer.startListening()
+                }
 
                 audioRecorder.startRecording()
                     .onEach { audioData ->
-                        // 音声データをVoskRecognizerに送信
-                        voskRecognizer.addAudioData(audioData)
+                        when (currentRecordingMode) {
+                            RecordingMode.Recognition -> {
+                                voskRecognizer.addAudioData(audioData)
+                            }
+                            RecordingMode.Registration -> {
+                                temporaryRecording.addAll(audioData.toList())
+                            }
+                        }
                     }
                     .catch { e ->
                         Log.e(tag, "Error in audio recording", e)
@@ -161,39 +187,67 @@ class VoskViewModel(
 
     fun stopRecording() {
         if (isRecording) {
-            isRecording = true
+            isRecording = false
             audioRecorder.stopRecording()
-            voskRecognizer.stopListening()
+
+            if (currentRecordingMode == RecordingMode.Recognition) {
+                voskRecognizer.stopListening()
+            }
         }
     }
 
-    /**
-     * 新しい話者を登録
-     */
-    fun registerSpeaker(speakerId: String, speakerName: String, audioData: ShortArray): Boolean {
+    // 録音データの取得
+    fun getRecordedAudioData(): ShortArray {
+        return temporaryRecording.toShortArray()
+    }
+
+    // 新しい話者の登録
+    fun registerSpeaker(speakerId: String, speakerName: String): Boolean {
         return try {
-            val embedding = speakerIdentifier.extractEmbedding(audioData)
-            if (embedding != null) {
-                speakerIdentifier.registerSpeaker(speakerId, speakerName, embedding)
-                refreshRegisteredSpeakers()
-                true
-            } else {
-                Log.e(tag, "Failed to extract speaker embedding")
-                false
+            val audioData = getRecordedAudioData()
+            if (audioData.isEmpty()) {
+                Log.e(tag, "No audio data available for registration")
+                return false
             }
+
+            // 録音データを保存
+            val recordingFile = speakerStorage.saveSpeakerRecording(speakerId, audioData)
+
+            // 特徴ベクトルを抽出
+            val embedding = speakerIdentifier.extractEmbedding(audioData)
+            if (embedding == null) {
+                Log.e(tag, "Failed to extract speaker embedding")
+                return false
+            }
+
+            // 特徴ベクトルを保存
+            val embeddingFile = speakerStorage.saveSpeakerEmbedding(speakerId, embedding)
+
+            // メタデータを保存
+            val metadata = SpeakerStorage.SpeakerMetadata(
+                id = speakerId,
+                name = speakerName,
+                registrationDate = Date(),
+                samplePath = recordingFile.absolutePath,
+                embeddingPath = embeddingFile.absolutePath
+            )
+            speakerStorage.saveSpeakerMetadata(metadata)
+
+            // 話者識別システムに登録
+            speakerIdentifier.registerSpeaker(speakerId, speakerName, embedding)
+
+            refreshRegisteredSpeakers()
+            true
         } catch (e: Exception) {
             Log.e(tag, "Error registering speaker", e)
             false
         }
     }
 
-    /**
-     * 登録済み話者リストの更新
-     */
+    // 登録済み話者リストの更新
     private fun refreshRegisteredSpeakers() {
         viewModelScope.launch {
-            // TODO: SpeakerIdentifierに登録済み話者リストを取得するメソッドを追加し、
-            // registeredSpeakersを更新する実装を追加
+            registeredSpeakers = speakerStorage.getAllSpeakerMetadata().map { it.id }
         }
     }
 

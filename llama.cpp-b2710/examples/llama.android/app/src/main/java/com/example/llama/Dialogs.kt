@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import kotlin.text.*
 
 @Composable
@@ -176,20 +177,38 @@ fun SpeakerRegistrationDialog(
 ) {
     var speakerId by remember { mutableStateOf("") }
     var speakerName by remember { mutableStateOf("") }
+    var recordingDuration by remember { mutableIntStateOf(0) }
+    var hasRecordedData by remember { mutableStateOf(false) }
+    var showError by remember { mutableStateOf<String?>(null) }
+
+    // 録音時間を更新するための LaunchedEffect
+    LaunchedEffect(isRecording) {
+        recordingDuration = 0
+        if (isRecording) {
+            while (true) {
+                delay(1000) // 1秒ごとに更新
+                recordingDuration++
+            }
+        }
+    }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Register New Speaker") },
+        onDismissRequest = {
+            if (!isRecording) onDismiss()
+        },
+        title = { Text("話者の登録") },
         text = {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
+                // 入力フィールド
                 OutlinedTextField(
                     value = speakerId,
                     onValueChange = { speakerId = it },
-                    label = { Text("Speaker ID") },
+                    label = { Text("話者ID") },
+                    enabled = !isRecording,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
@@ -198,19 +217,70 @@ fun SpeakerRegistrationDialog(
                 OutlinedTextField(
                     value = speakerName,
                     onValueChange = { speakerName = it },
-                    label = { Text("Speaker Name") },
+                    label = { Text("話者名") },
+                    enabled = !isRecording,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 )
 
+                // 録音状態の表示
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            "録音状態",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (isRecording) {
+                            Text(
+                                "録音中... ${recordingDuration}秒",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp)
+                            )
+                        } else if (hasRecordedData) {
+                            Text("録音完了（${recordingDuration}秒）")
+                        } else {
+                            Text("録音待機中")
+                        }
+                    }
+                }
+
+                // 録音ボタン
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
-                        onClick = if (isRecording) onStopRecording else onStartRecording,
+                        onClick = {
+                            if (isRecording) {
+                                onStopRecording()
+                                hasRecordedData = true
+                            } else {
+                                if (speakerId.isBlank() || speakerName.isBlank()) {
+                                    showError = "話者IDと話者名を入力してください"
+                                    return@Button
+                                }
+                                viewModel.startRecording(VoskViewModel.Companion.RecordingMode.Registration)
+                                onStartRecording()
+                                hasRecordedData = false
+                            }
+                        },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isRecording)
                                 MaterialTheme.colorScheme.error
@@ -218,15 +288,16 @@ fun SpeakerRegistrationDialog(
                                 MaterialTheme.colorScheme.primary
                         )
                     ) {
-                        Text(if (isRecording) "Stop Recording" else "Start Recording")
+                        Text(if (isRecording) "録音停止" else "録音開始")
                     }
                 }
 
-                if (isRecording) {
+                // エラーメッセージ
+                showError?.let { error ->
                     Text(
-                        "Recording in progress...",
-                        modifier = Modifier.padding(top = 8.dp),
-                        color = MaterialTheme.colorScheme.error
+                        text = error,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             }
@@ -234,18 +305,19 @@ fun SpeakerRegistrationDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // viewModelを使用して話者登録を実行
-                    viewModel.registerSpeaker(
-                        speakerId,
-                        speakerName,
-                        // TODO: 録音データの取得方法を実装
-                        ShortArray(0)
-                    )
-                    onDismiss()
+                    if (hasRecordedData) {
+                        if (viewModel.registerSpeaker(speakerId, speakerName)) {
+                            onDismiss()
+                        } else {
+                            showError = "話者の登録に失敗しました"
+                        }
+                    } else {
+                        showError = "録音データがありません"
+                    }
                 },
-                enabled = !isRecording && speakerId.isNotBlank() && speakerName.isNotBlank()
+                enabled = !isRecording && hasRecordedData
             ) {
-                Text("Register")
+                Text("登録")
             }
         },
         dismissButton = {
@@ -253,7 +325,7 @@ fun SpeakerRegistrationDialog(
                 onClick = onDismiss,
                 enabled = !isRecording
             ) {
-                Text("Cancel")
+                Text("キャンセル")
             }
         }
     )
