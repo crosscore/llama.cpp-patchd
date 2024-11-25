@@ -100,8 +100,7 @@ bool is_valid_utf8(const char *string) {
     return true;
 }
 
-extern "C"
-JNIEXPORT jlong JNICALL
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject /*unused*/, jstring filename) {
     llama_model_params model_params = llama_model_default_params();
 
@@ -120,14 +119,12 @@ Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject /*unused*/, jstring 
     return reinterpret_cast<jlong>(model);
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1model(JNIEnv * /*unused*/, jobject /*unused*/, jlong model) {
     llama_free_model(reinterpret_cast<llama_model *>(model)); // NOLINT(*-no-int-to-ptr)
 }
 
-extern "C"
-JNIEXPORT jlong JNICALL
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel, jint seed, jint n_ctx, jint n_threads) {
     auto *model = reinterpret_cast<llama_model *>(jmodel);
 
@@ -160,26 +157,22 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong j
     return reinterpret_cast<jlong>(context);
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1context(JNIEnv * /*unused*/, jobject /*unused*/, jlong context) {
     llama_free(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_backend_1free(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_free();
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_log_1to_1android(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_log_set(log_callback, nullptr);
 }
 
-extern "C"
-JNIEXPORT void JNICALL
+extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
                                        jlong batch_pointer) {
     auto *batch = reinterpret_cast<llama_batch *>(batch_pointer);
@@ -231,8 +224,7 @@ Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
     delete batch;
 }
 
-extern "C"
-JNIEXPORT jlong JNICALL
+extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(
         JNIEnv *env,
         jobject /*thiz*/,
@@ -412,7 +404,7 @@ Java_com_example_llama_Llm_completion_1loop(
     const auto n_cur = env->CallIntMethod(intvar_ncur, la_int_var_value);
     const auto start_pos = n_cur - g_input_token_count;
 
-    // skip_next_tokenの処理を後ろに移動
+    // skip_next_tokenの処理
     if (skip_next_token) {
         skip_next_token = false;
         LOGi("Skipping token as it was used in combination");
@@ -436,7 +428,7 @@ Java_com_example_llama_Llm_completion_1loop(
 
     // 基本的なチェック
     if (new_token_id == 0 || llama_token_is_eog(model, new_token_id)) {
-        LOGi("EOS token detected (id: %d) at position: %d/%d",
+        LOGi("Token[%d]: EOS token detected at position: %d/%d",
              new_token_id, start_pos + 1, n_len);
         return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
     }
@@ -453,40 +445,11 @@ Java_com_example_llama_Llm_completion_1loop(
         return env->NewStringUTF("");
     }
 
-    // 現在のトークンが改行かどうかチェック
-    std::string current_piece(piece, length);
-    bool is_newline = (current_piece == "\n");
-
-    if (is_newline) {
-        // 次のトークンを予測
-        llama_batch_clear(*batch);
-        llama_batch_add(*batch, new_token_id, n_cur, {0}, true);
-        if (llama_decode(context, *batch) == 0) {
-            auto *next_logits = llama_get_logits_ith(context, 0);
-            if (next_logits != nullptr) {
-                std::vector<llama_token_data> next_candidates;
-                next_candidates.reserve(n_vocab);
-                for (llama_token token_id = 0; token_id < n_vocab; token_id++) {
-                    next_candidates.emplace_back(llama_token_data{token_id, next_logits[token_id], 0.0f});
-                }
-                llama_token_data_array next_candidates_p = {next_candidates.data(), next_candidates.size(), false};
-                const auto predicted_next_token = llama_sample_token_greedy(context, &next_candidates_p);
-
-                // 次のトークンの文字列を取得
-                char next_piece[64] = {0};
-                int next_length = llama_token_to_piece(model, predicted_next_token, next_piece, sizeof(next_piece), true);
-                if (next_length > 0) {
-                    std::string next_token_str(next_piece, next_length);
-                    // 次のトークンが"User"かチェック
-                    if (next_token_str == "User") {
-                        LOGi("Token[%d] -> '\\n' (detected User following, ending response)",
-                             new_token_id);
-                        return env->NewStringUTF("<EOS_TOKEN_DETECTED>");
-                    }
-                }
-            }
-        }
-        // "User"が続かない場合は改行を表示
+    // 特殊なトークンIDの処理
+    if (new_token_id == 32766) {
+        LOGi("Token[%d] -> '\\n\\n' (double newline detected)", new_token_id);
+        return env->NewStringUTF("<CONVERSATION_END>");
+    } else if (new_token_id == 212) {
         LOGi("Token[%d] -> '\\n'", new_token_id);
     }
 
@@ -502,7 +465,6 @@ Java_com_example_llama_Llm_completion_1loop(
         snprintf(hex, sizeof(hex), "0x%02X ", (unsigned char)piece[i]);
         bytes_log += hex;
     }
-    // LOGi("Token[%d]: %s", new_token_id, bytes_log.c_str());
 
     // UTF-8シーケンスの処理
     cached_token_chars += std::string(piece, length);
@@ -519,14 +481,14 @@ Java_com_example_llama_Llm_completion_1loop(
         }
 
         needs_next_token = cached_token_chars.length() < expected_length;
-
-        //LOGi("UTF-8 analysis - Expected: %zu, Current: %zu, Valid: %d, Needs next: %d", expected_length, cached_token_chars.length(), is_valid, needs_next_token);
     }
 
     jstring new_token = nullptr;
     if (is_valid && !needs_next_token) {
         new_token = env->NewStringUTF(cached_token_chars.c_str());
-        LOGi("Token[%d] -> '%s'", new_token_id, cached_token_chars.c_str());
+        if (new_token_id != 212) {  // 改行トークンの場合は既にログ出力済み
+            LOGi("Token[%d] -> '%s'", new_token_id, cached_token_chars.c_str());
+        }
         cached_token_chars.clear();
     } else if (needs_next_token) {
         // 次のトークンの準備
@@ -607,8 +569,7 @@ Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unuse
 
 #pragma clang diagnostic pop
 
-extern "C"
-JNIEXPORT jintArray JNICALL
+extern "C" JNIEXPORT jintArray JNICALL
 Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlong model, jstring text) {
     const char *input = env->GetStringUTFChars(text, nullptr);
     auto *model_ptr = reinterpret_cast<llama_model *>(model); // NOLINT(*-no-int-to-ptr)

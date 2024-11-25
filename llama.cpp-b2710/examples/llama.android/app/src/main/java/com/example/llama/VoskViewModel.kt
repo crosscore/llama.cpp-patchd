@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.util.Date
 
 class VoskViewModel(
     application: Application,
@@ -45,6 +44,18 @@ class VoskViewModel(
 
     var registeredSpeakers by mutableStateOf(emptyList<String>())
         private set
+
+    // 話者登録状態を追加
+    var registrationState by mutableStateOf<RegistrationState>(RegistrationState.Idle)
+        private set
+
+    sealed class RegistrationState {
+        data object Idle : RegistrationState()
+        data object Recording : RegistrationState()
+        data object Processing : RegistrationState()
+        data class Success(val speakerId: String) : RegistrationState()
+        data class Error(val message: String) : RegistrationState()
+    }
 
     init {
         initializeModel()
@@ -201,47 +212,44 @@ class VoskViewModel(
         return temporaryRecording.toShortArray()
     }
 
-    // 新しい話者の登録
+    // 新しい話者の登録処理を改善
     fun registerSpeaker(speakerId: String, speakerName: String): Boolean {
         return try {
+            registrationState = RegistrationState.Processing
+
             val audioData = getRecordedAudioData()
             if (audioData.isEmpty()) {
-                Log.e(tag, "No audio data available for registration")
+                registrationState = RegistrationState.Error("No audio data available for registration")
                 return false
             }
 
-            // 録音データを保存
-            val recordingFile = speakerStorage.saveSpeakerRecording(speakerId, audioData)
+            // VoskRecognizer を使って話者を登録
+            val success = voskRecognizer.registerSpeaker(speakerId, speakerName, audioData)
 
-            // 特徴ベクトルを抽出
-            val embedding = speakerIdentifier.extractEmbedding(audioData)
-            if (embedding == null) {
-                Log.e(tag, "Failed to extract speaker embedding")
-                return false
+            if (success) {
+                registrationState = RegistrationState.Success(speakerId)
+                refreshRegisteredSpeakers()
+                true
+            } else {
+                registrationState = RegistrationState.Error("Failed to register speaker")
+                false
             }
-
-            // 特徴ベクトルを保存
-            val embeddingFile = speakerStorage.saveSpeakerEmbedding(speakerId, embedding)
-
-            // メタデータを保存
-            val metadata = SpeakerStorage.SpeakerMetadata(
-                id = speakerId,
-                name = speakerName,
-                registrationDate = Date(),
-                samplePath = recordingFile.absolutePath,
-                embeddingPath = embeddingFile.absolutePath
-            )
-            speakerStorage.saveSpeakerMetadata(metadata)
-
-            // 話者識別システムに登録
-            speakerIdentifier.registerSpeaker(speakerId, speakerName, embedding)
-
-            refreshRegisteredSpeakers()
-            true
         } catch (e: Exception) {
             Log.e(tag, "Error registering speaker", e)
+            registrationState = RegistrationState.Error(e.message ?: "Unknown error")
             false
         }
+    }
+
+    // 録音状態の管理を改善
+    fun startRegistrationRecording() {
+        registrationState = RegistrationState.Recording
+        startRecording(RecordingMode.Registration)
+    }
+
+    fun stopRegistrationRecording() {
+        stopRecording()
+        registrationState = RegistrationState.Idle
     }
 
     // 登録済み話者リストの更新

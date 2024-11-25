@@ -9,6 +9,7 @@ import org.vosk.android.RecognitionListener
 import org.vosk.android.SpeechService
 import java.io.File
 import java.io.IOException
+import java.util.Date
 
 class VoskRecognizer private constructor(private val context: Context) {
     private val tag = "VoskRecognizer"
@@ -180,9 +181,31 @@ class VoskRecognizer private constructor(private val context: Context) {
     fun registerSpeaker(id: String, name: String, audioData: ShortArray): Boolean {
         return try {
             speakerIdentifier?.let { identifier ->
+                // 特徴ベクトルの抽出
                 val embedding = identifier.extractEmbedding(audioData)
                 embedding?.let { emb ->
+                    // SpeakerIdentifier に登録
                     identifier.registerSpeaker(id, name, emb)
+
+                    // SpeakerStorage にも保存
+                    val storage = SpeakerStorage.getInstance(context)
+
+                    // 録音データを保存
+                    val recordingFile = storage.saveSpeakerRecording(id, audioData)
+
+                    // 特徴ベクトルを保存
+                    val embeddingFile = storage.saveSpeakerEmbedding(id, emb)
+
+                    // メタデータを保存
+                    val metadata = SpeakerStorage.SpeakerMetadata(
+                        id = id,
+                        name = name,
+                        registrationDate = Date(),
+                        samplePath = recordingFile.absolutePath,
+                        embeddingPath = embeddingFile.absolutePath
+                    )
+                    storage.saveSpeakerMetadata(metadata)
+
                     true
                 } ?: false
             } ?: false

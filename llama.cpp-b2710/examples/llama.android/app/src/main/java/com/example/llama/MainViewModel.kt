@@ -133,7 +133,7 @@ class MainViewModel(
 
     // For SystemPrompt
     var systemPrompt by mutableStateOf(
-        """あなたはUserからの質問や要望に対して日本語で簡潔に回答するAssistantです。""".trimMargin()
+        """あなたは親切なアシスタントです。ユーザーの質問に簡潔に回答します。""".trimMargin()
     )
         private set
 
@@ -163,29 +163,7 @@ class MainViewModel(
         if (text.isEmpty()) return
         message = ""
 
-        val formattedPrompt = if (isHistoryEnabled) {
-            buildString {
-                append("System:")
-                appendLine(systemPrompt)
-                messages.forEach { (user, assistant) ->
-                    append("User:")
-                    appendLine(user)
-                    append("Assistant:")
-                    appendLine(assistant)
-                }
-                append("User:")
-                appendLine(text)
-                append("Assistant:")
-            }
-        } else {
-            buildString {
-                append("System:")
-                appendLine(systemPrompt)
-                append("User:")
-                appendLine(text)
-                append("Assistant:")
-            }
-        }
+        val formattedPrompt = "<|user|>$text<|endofuser|>\n<|assistant|>"
 
         Log.d(tag, "--- Sending prompt ---\n$formattedPrompt")
         messages = messages + Pair(text, "")

@@ -410,7 +410,7 @@ fun MainCompose(
             }) { Text("Copy") }
         }
 
-        // コントロールボタン行1（既存＋新規）
+        // コントロールボタン行1
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -420,11 +420,9 @@ fun MainCompose(
             Button(onClick = { viewModel.toggleMemoryInfo() }) { Text("Memory") }
             Button(onClick = { viewModel.toggleModelPath() }) { Text("Model Path") }
             Button(onClick = { onShowModelDialog(true) }) { Text("Load Model") }
-            // 話者管理ボタンを追加
-            Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
         }
 
-        // コントロールボタン行2（既存）
+        // コントロールボタン行2
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -445,7 +443,7 @@ fun MainCompose(
             }
         }
 
-        // 音声入力ボタン行（既存）
+        // 音声入力ボタン行
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -466,9 +464,8 @@ fun MainCompose(
                     else
                         MaterialTheme.colorScheme.primary
                 )
-            ) {
-                Text(if (isRecording) "Stop" else "Record")
-            }
+            ) { Text(if (isRecording) "Stop" else "Record") }
+            Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
         }
 
         // 既存のダイアログ

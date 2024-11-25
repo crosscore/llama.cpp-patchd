@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -178,7 +177,6 @@ fun SpeakerRegistrationDialog(
     var speakerId by remember { mutableStateOf("") }
     var speakerName by remember { mutableStateOf("") }
     var recordingDuration by remember { mutableIntStateOf(0) }
-    var hasRecordedData by remember { mutableStateOf(false) }
     var showError by remember { mutableStateOf<String?>(null) }
 
     // 録音時間を更新するための LaunchedEffect
@@ -186,9 +184,23 @@ fun SpeakerRegistrationDialog(
         recordingDuration = 0
         if (isRecording) {
             while (true) {
-                delay(1000) // 1秒ごとに更新
+                delay(1000)
                 recordingDuration++
             }
+        }
+    }
+
+    // 登録状態の監視
+    val registrationState = viewModel.registrationState
+    LaunchedEffect(registrationState) {
+        when (registrationState) {
+            is VoskViewModel.RegistrationState.Success -> {
+                onDismiss()
+            }
+            is VoskViewModel.RegistrationState.Error -> {
+                showError = registrationState.message
+            }
+            else -> {}
         }
     }
 
@@ -203,7 +215,6 @@ fun SpeakerRegistrationDialog(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
-                // 入力フィールド
                 OutlinedTextField(
                     value = speakerId,
                     onValueChange = { speakerId = it },
@@ -242,53 +253,30 @@ fun SpeakerRegistrationDialog(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        if (isRecording) {
-                            Text(
-                                "録音中... ${recordingDuration}秒",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp)
-                            )
-                        } else if (hasRecordedData) {
-                            Text("録音完了（${recordingDuration}秒）")
-                        } else {
-                            Text("録音待機中")
-                        }
-                    }
-                }
-
-                // 録音ボタン
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = {
-                            if (isRecording) {
-                                onStopRecording()
-                                hasRecordedData = true
-                            } else {
-                                if (speakerId.isBlank() || speakerName.isBlank()) {
-                                    showError = "話者IDと話者名を入力してください"
-                                    return@Button
-                                }
-                                viewModel.startRecording(VoskViewModel.Companion.RecordingMode.Registration)
-                                onStartRecording()
-                                hasRecordedData = false
+                        when {
+                            isRecording -> {
+                                Text(
+                                    "録音中... ${recordingDuration}秒",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                )
                             }
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isRecording)
-                                MaterialTheme.colorScheme.error
-                            else
-                                MaterialTheme.colorScheme.primary
-                        )
-                    ) {
-                        Text(if (isRecording) "録音停止" else "録音開始")
+                            registrationState is VoskViewModel.RegistrationState.Processing -> {
+                                Text("処理中...")
+                                LinearProgressIndicator(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                )
+                            }
+                            else -> {
+                                Text(if (recordingDuration > 0) "録音完了（${recordingDuration}秒）" else "録音待機中")
+                            }
+                        }
                     }
                 }
 
@@ -297,7 +285,7 @@ fun SpeakerRegistrationDialog(
                     Text(
                         text = error,
                         color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp)
+                        modifier = Modifier.padding(vertical = 8.dp)
                     )
                 }
             }
@@ -305,27 +293,48 @@ fun SpeakerRegistrationDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    if (hasRecordedData) {
-                        if (viewModel.registerSpeaker(speakerId, speakerName)) {
-                            onDismiss()
-                        } else {
-                            showError = "話者の登録に失敗しました"
-                        }
-                    } else {
-                        showError = "録音データがありません"
+                    if (speakerId.isBlank() || speakerName.isBlank()) {
+                        showError = "話者IDと話者名を入力してください"
+                        return@Button
                     }
+                    if (recordingDuration == 0) {
+                        showError = "音声を録音してください"
+                        return@Button
+                    }
+                    viewModel.registerSpeaker(speakerId, speakerName)
                 },
-                enabled = !isRecording && hasRecordedData
+                enabled = !isRecording && recordingDuration > 0
             ) {
                 Text("登録")
             }
         },
         dismissButton = {
-            Button(
-                onClick = onDismiss,
-                enabled = !isRecording
-            ) {
-                Text("キャンセル")
+            Row {
+                Button(
+                    onClick = {
+                        if (isRecording) {
+                            onStopRecording()
+                        } else {
+                            viewModel.startRegistrationRecording()
+                            onStartRecording()
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isRecording)
+                            MaterialTheme.colorScheme.error
+                        else
+                            MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Text(if (isRecording) "録音停止" else "録音開始")
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(
+                    onClick = onDismiss,
+                    enabled = !isRecording
+                ) {
+                    Text("キャンセル")
+                }
             }
         }
     )
