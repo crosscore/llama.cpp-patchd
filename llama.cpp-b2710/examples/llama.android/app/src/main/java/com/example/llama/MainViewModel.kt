@@ -163,18 +163,45 @@ class MainViewModel(
         if (text.isEmpty()) return
         message = ""
 
-        val formattedPrompt = "<|user|>$text<|endofuser|>\n<|assistant|>"
+        // 履歴を含むプロンプトを構築
+        val formattedPrompt = buildString {
+            // システムプロンプトを追加する場合
+            // append("<|system|>")
+            // append(systemPrompt)
+            // append("<|endofsystem|>\n")
 
-        Log.d(tag, "--- Sending prompt ---\n$formattedPrompt")
+            // 履歴が有効な場合は過去の会話を追加
+            if (isHistoryEnabled && messages.isNotEmpty()) {
+                messages.forEach { (userMessage, assistantResponse) ->
+                    append("<|user|>")
+                    append(userMessage)
+                    append("<|endofuser|>\n")
+                    append("<|assistant|>")
+                    append(assistantResponse)
+                    append("<|endofassistant|>\n")
+                }
+            }
+
+            // 新しいメッセージを追加
+            append("<|user|>")
+            append(text)
+            append("<|endofuser|>\n")
+            append("<|assistant|>")
+        }
+
+        Log.d(tag, "--- Sending prompt with${if (!isHistoryEnabled) "out" else ""} history ---\n$formattedPrompt")
         messages = messages + Pair(text, "")
         val currentIndex = messages.lastIndex
 
+        sendJob?.cancel() // 既存のジョブがあれば確実にキャンセル
         sendJob = viewModelScope.launch {
             val responseBuilder = StringBuilder()
+            var isConversationEnded = false // 会話終了フラグ
+
             try {
                 llm.send(formattedPrompt, maxTokens, seed, contextSize, numThreads)
                     .onCompletion { cause ->
-                        if (cause == null) {
+                        if (cause == null && !isConversationEnded) {
                             messages = messages.toMutableList().apply {
                                 this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                             }
@@ -197,14 +224,18 @@ class MainViewModel(
                         }
                     }
                     .collect { token ->
+                        if (isConversationEnded) {
+                            return@collect
+                        }
+
                         when (token) {
                             "<CONVERSATION_END>" -> {
+                                isConversationEnded = true
                                 log("Conversation ended with double newline")
-                                // 現在の応答を確定
                                 messages = messages.toMutableList().apply {
                                     this[currentIndex] = this[currentIndex].copy(second = responseBuilder.toString())
                                 }
-                                return@collect
+                                sendJob?.cancel() // 明示的にジョブをキャンセル
                             }
                             else -> {
                                 responseBuilder.append(token)
@@ -216,8 +247,13 @@ class MainViewModel(
                     }
             } catch (e: CancellationException) {
                 Log.i(tag, "send() canceled")
-                messages = messages.toMutableList().apply {
-                    this[currentIndex] = this[currentIndex].copy(second = "Operation canceled.")
+                if (!isConversationEnded) {
+                    messages = messages.toMutableList().apply {
+                        this[currentIndex] = this[currentIndex].copy(second =
+                        if (responseBuilder.isNotEmpty()) responseBuilder.toString()
+                        else "Operation canceled."
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(tag, "send() failed", e)
