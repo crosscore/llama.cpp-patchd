@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import java.io.IOException
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AudioRecorder private constructor(context: Context) {
     private val appContext = context.applicationContext
@@ -35,7 +36,7 @@ class AudioRecorder private constructor(context: Context) {
     }
 
     private var audioRecord: AudioRecord? = null
-    private var isRecording = false
+    private val isRecording = AtomicBoolean(false)
     private val bufferSize: Int = AudioRecord.getMinBufferSize(
         SAMPLE_RATE,
         CHANNEL_CONFIG,
@@ -52,65 +53,53 @@ class AudioRecorder private constructor(context: Context) {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
-    /**
-     * AudioRecordの初期化（権限チェック付き）
-     */
+    @Synchronized
     @Throws(SecurityException::class, IllegalStateException::class)
     private fun initializeAudioRecord() {
         if (!hasPermission()) {
             throw SecurityException("Recording permission not granted")
         }
 
-        if (audioRecord != null) {
-            return
-        }
-
         try {
-            audioRecord = if (ActivityCompat.checkSelfPermission(
-                    appContext,
-                    Manifest.permission.RECORD_AUDIO
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                AudioRecord(
-                    MediaRecorder.AudioSource.MIC,
-                    SAMPLE_RATE,
-                    CHANNEL_CONFIG,
-                    AUDIO_FORMAT,
-                    bufferSize
-                )
-            } else {
-                throw SecurityException("Recording permission not granted")
+            // 既存のAudioRecordインスタンスがある場合は解放
+            releaseAudioRecord()
+
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                AUDIO_FORMAT,
+                bufferSize
+            ).apply {
+                if (state != AudioRecord.STATE_INITIALIZED) {
+                    release()
+                    throw IllegalStateException("AudioRecord initialization failed")
+                }
             }
 
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                releaseAudioRecord()
-                throw IllegalStateException("AudioRecord initialization failed")
-            }
-
-            audioRecord?.startRecording()
-            isRecording = true
-            Log.i(tag, "Audio recording started")
-        } catch (e: SecurityException) {
-            Log.e(tag, "Permission denied for audio recording", e)
-            throw e
-        } catch (e: IllegalStateException) {
+            Log.d(tag, "AudioRecord initialized successfully")
+        } catch (e: Exception) {
             Log.e(tag, "Failed to initialize AudioRecord", e)
             throw e
         }
     }
 
-    /**
-     * 録音開始とデータのストリーミング
-     */
     fun startRecording(): Flow<ShortArray> = flow {
         try {
-            initializeAudioRecord()
+            synchronized(this) {
+                if (isRecording.get()) {
+                    Log.w(tag, "Recording is already in progress")
+                    return@flow
+                }
+                initializeAudioRecord()
+                audioRecord?.startRecording()
+                isRecording.set(true)
+                Log.i(tag, "Audio recording started")
+            }
 
             val buffer = ShortArray(bufferSize / 2)
-            var readResult: Int
-
-            while (isRecording) {
-                readResult = audioRecord?.read(buffer, 0, buffer.size) ?: -1
+            while (isRecording.get()) {
+                val readResult = audioRecord?.read(buffer, 0, buffer.size) ?: -1
 
                 when {
                     readResult > 0 -> {
@@ -126,20 +115,26 @@ class AudioRecorder private constructor(context: Context) {
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.e(tag, "Error during recording", e)
+            throw e
         } finally {
-            releaseAudioRecord()
+            synchronized(this) {
+                releaseAudioRecord()
+            }
         }
     }.flowOn(Dispatchers.IO)
 
-    /**
-     * 録音停止
-     */
+    @Synchronized
     fun stopRecording() {
-        isRecording = false
-        releaseAudioRecord()
-        Log.i(tag, "Audio recording stopped")
+        if (isRecording.get()) {
+            isRecording.set(false)
+            releaseAudioRecord()
+            Log.i(tag, "Audio recording stopped")
+        }
     }
 
+    @Synchronized
     private fun releaseAudioRecord() {
         try {
             audioRecord?.let { record ->
@@ -147,11 +142,10 @@ class AudioRecorder private constructor(context: Context) {
                     record.stop()
                 }
                 record.release()
+                audioRecord = null
             }
         } catch (e: Exception) {
             Log.e(tag, "Error releasing AudioRecord", e)
-        } finally {
-            audioRecord = null
         }
     }
 }
