@@ -9,6 +9,7 @@ import android.media.MediaRecorder
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -116,8 +117,15 @@ class AudioRecorder private constructor(context: Context) {
                 }
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error during recording", e)
-            throw e
+            when (e) {
+                is CancellationException -> {
+                    Log.d(tag, "Recording flow cancelled normally")
+                }
+                else -> {
+                    Log.e(tag, "Error during recording", e)
+                    throw e
+                }
+            }
         } finally {
             synchronized(this) {
                 releaseAudioRecord()

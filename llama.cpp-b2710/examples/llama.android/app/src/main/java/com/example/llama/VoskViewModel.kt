@@ -8,9 +8,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 
@@ -25,7 +27,12 @@ class VoskViewModel(
     private val tag = "VoskViewModel"
 
     // 音声認識の状態
+    private val _isRecording = MutableStateFlow(false)
     var isRecording by mutableStateOf(false)
+        private set
+
+    private var recordingJob: Job? = null
+
     private var isModelInitialized by mutableStateOf(false)
 
     // 音声認識の結果
@@ -153,43 +160,57 @@ class VoskViewModel(
             return
         }
 
-        if (!isModelInitialized) {
-            errorMessage = "Model not initialized"
-            return
-        }
-
         viewModelScope.launch {
             try {
-                isRecording = true
-                currentRecordingMode = mode
+                if (_isRecording.value) {
+                    Log.w(tag, "Recording is already in progress")
+                    return@launch
+                }
+
                 currentTranscript = ""
                 errorMessage = null
                 temporaryRecording.clear()
 
-                if (mode == RecordingMode.Recognition) {
-                    voskRecognizer.startListening()
+                when (mode) {
+                    RecordingMode.Recognition -> {
+                        voskRecognizer.startListening()
+                    }
+                    RecordingMode.Registration -> {
+                        registrationState = RegistrationState.Recording
+                    }
                 }
 
-                audioRecorder.startRecording()
-                    .onEach { audioData ->
-                        when (currentRecordingMode) {
-                            RecordingMode.Recognition -> {
-                                voskRecognizer.addAudioData(audioData)
+                _isRecording.value = true
+                isRecording = true
+
+                recordingJob = viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        audioRecorder.startRecording()
+                            .collect { audioData ->
+                                when (mode) {
+                                    RecordingMode.Recognition -> {
+                                        voskRecognizer.addAudioData(audioData)
+                                    }
+                                    RecordingMode.Registration -> {
+                                        temporaryRecording.addAll(audioData.toList())
+                                    }
+                                }
                             }
-                            RecordingMode.Registration -> {
-                                temporaryRecording.addAll(audioData.toList())
+                    } catch (e: Exception) {
+                        when (e) {
+                            is CancellationException -> {
+                                Log.d(tag, "Recording cancelled normally")
+                            }
+                            else -> {
+                                Log.e(tag, "Error in recording", e)
+                                errorMessage = "Recording error: ${e.message}"
+                                stopRecording()
                             }
                         }
                     }
-                    .catch { e ->
-                        Log.e(tag, "Error in audio recording", e)
-                        errorMessage = "Recording error: ${e.message}"
-                        stopRecording()
-                    }
-                    .launchIn(this)
-
+                }
             } catch (e: Exception) {
-                Log.e(tag, "Error starting recording", e)
+                Log.e(tag, "Failed to start recording", e)
                 errorMessage = "Error: ${e.message}"
                 stopRecording()
             }
@@ -197,14 +218,29 @@ class VoskViewModel(
     }
 
     fun stopRecording() {
-        if (isRecording) {
-            isRecording = false
-            audioRecorder.stopRecording()
-
-            if (currentRecordingMode == RecordingMode.Recognition) {
-                voskRecognizer.stopListening()
+        viewModelScope.launch {
+            try {
+                recordingJob?.cancelAndJoin()
+            } catch (e: Exception) {
+                // キャンセル時の例外は無視
+                Log.d(tag, "Recording job cancelled", e)
+            } finally {
+                if (_isRecording.value) {
+                    _isRecording.value = false
+                    isRecording = false
+                    audioRecorder.stopRecording()
+                    voskRecognizer.stopListening()
+                }
+                recordingJob = null
             }
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopRecording()
+        voskRecognizer.release()
+        speakerIdentifier.release()
     }
 
     // 録音データの取得
@@ -212,7 +248,27 @@ class VoskViewModel(
         return temporaryRecording.toShortArray()
     }
 
-    // 新しい話者の登録処理を改善
+    private fun debugSaveAudioData(speakerId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val audioData = getRecordedAudioData()
+                if (audioData.isNotEmpty()) {
+                    val storage = SpeakerStorage.getInstance(appContext)
+                    val file = storage.saveSpeakerRecording(speakerId, audioData)
+                    Log.d(tag, "Saved audio data to: ${file.absolutePath}")
+
+                    // 保存したファイルの情報を確認
+                    Log.d(tag, "File exists: ${file.exists()}")
+                    Log.d(tag, "File size: ${file.length()} bytes")
+                } else {
+                    Log.w(tag, "No audio data available to save")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to save audio data", e)
+            }
+        }
+    }
+
     fun registerSpeaker(speakerId: String, speakerName: String): Boolean {
         return try {
             registrationState = RegistrationState.Processing
@@ -222,6 +278,9 @@ class VoskViewModel(
                 registrationState = RegistrationState.Error("No audio data available for registration")
                 return false
             }
+
+            // デバッグ用に音声データを保存
+            debugSaveAudioData(speakerId)
 
             // VoskRecognizer を使って話者を登録
             val success = voskRecognizer.registerSpeaker(speakerId, speakerName, audioData)
@@ -261,13 +320,6 @@ class VoskViewModel(
 
     fun clearError() {
         errorMessage = null
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        stopRecording()
-        voskRecognizer.release()
-        speakerIdentifier.release()
     }
 
     // Factory for creating VoskViewModel with Application Context

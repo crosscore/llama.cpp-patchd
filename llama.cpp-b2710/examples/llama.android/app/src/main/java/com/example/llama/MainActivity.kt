@@ -74,6 +74,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun checkSpeakerData() {
+        viewModel.voskViewModel?.let { voskViewModel ->
+            val baseDir = getExternalFilesDir(null)
+            val speakerDataDir = File(baseDir, "speaker_data")
+
+            Log.d("SpeakerData", "Base directory: ${baseDir?.absolutePath}")
+            Log.d("SpeakerData", "Speaker data exists: ${speakerDataDir.exists()}")
+
+            if (speakerDataDir.exists()) {
+                Log.d("SpeakerData", "Speaker data contents:")
+                speakerDataDir.walk().forEach { file ->
+                    Log.d("SpeakerData", "- ${baseDir?.let { file.relativeTo(it).path }}")
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -96,6 +113,9 @@ class MainActivity : ComponentActivity() {
 
         // Initial loading of models
         loadModels()
+
+        // SpeakerDataの確認
+        checkSpeakerData()
 
         setContent {
             var showModelDialog by remember { mutableStateOf(false) }
