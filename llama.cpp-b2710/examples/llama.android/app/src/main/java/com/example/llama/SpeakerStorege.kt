@@ -13,22 +13,44 @@ import java.util.*
 class SpeakerStorage private constructor(context: Context) {
     private val tag = "SpeakerStorage"
     private val appContext = context.applicationContext
-    private val baseDir: File
-        get() = appContext.getExternalFilesDir(null)
-            ?: throw IllegalStateException("External storage is not available")
 
-    private val speakerDataDir: File
-        get() = File(baseDir, "speaker_data").also {
-            if (!it.exists()) it.mkdirs()
+    private val baseDir: File by lazy {
+        appContext.getExternalFilesDir(null)?.also { dir ->
+            Log.d(tag, "Base directory initialized: ${dir.absolutePath}")
+        } ?: throw IllegalStateException("External storage is not available")
+    }
+
+    private val speakerDataDir: File by lazy {
+        File(baseDir, "speaker_data").also { dir ->
+            if (!dir.exists()) {
+                dir.mkdirs()
+                Log.d(tag, "Created speaker data directory: ${dir.absolutePath}")
+            } else {
+                Log.d(tag, "Speaker data directory exists: ${dir.absolutePath}")
+            }
         }
+    }
 
-    private val recordingsDir: File
-        get() = File(speakerDataDir, "recordings").also {
-            if (!it.exists()) it.mkdirs()
+    private val recordingsDir: File by lazy {
+        File(speakerDataDir, "recordings").also { dir ->
+            if (!dir.exists()) {
+                dir.mkdirs()
+                Log.d(tag, "Created recordings directory: ${dir.absolutePath}")
+            } else {
+                Log.d(tag, "Recordings directory exists: ${dir.absolutePath}")
+            }
         }
+    }
 
-    private val metadataFile: File
-        get() = File(speakerDataDir, "metadata.json")
+    private val metadataFile: File by lazy {
+        File(speakerDataDir, "metadata.json").also { file ->
+            if (!file.exists()) {
+                file.createNewFile()
+                file.writeText("[]")
+                Log.d(tag, "Created metadata file: ${file.absolutePath}")
+            }
+        }
+    }
 
     data class SpeakerMetadata(
         val id: String,
@@ -44,7 +66,10 @@ class SpeakerStorage private constructor(context: Context) {
 
         fun getInstance(context: Context): SpeakerStorage {
             return instance ?: synchronized(this) {
-                instance ?: SpeakerStorage(context).also { instance = it }
+                instance ?: SpeakerStorage(context).also {
+                    instance = it
+                    Log.d("SpeakerStorage", "Created new instance")
+                }
             }
         }
     }
@@ -53,8 +78,11 @@ class SpeakerStorage private constructor(context: Context) {
      * 新しい話者の録音データを保存
      */
     fun saveSpeakerRecording(speakerId: String, audioData: ShortArray): File {
-        val speakerDir = File(recordingsDir, speakerId).also {
-            if (!it.exists()) it.mkdirs()
+        val speakerDir = File(recordingsDir, speakerId).also { dir ->
+            if (!dir.exists()) {
+                dir.mkdirs()
+                Log.d(tag, "Created speaker directory: ${dir.absolutePath}")
+            }
         }
 
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -71,6 +99,7 @@ class SpeakerStorage private constructor(context: Context) {
                 fos.write(byteBuffer)
             }
             Log.i(tag, "Saved recording for speaker $speakerId: ${recordingFile.path}")
+            Log.d(tag, "Recording file size: ${recordingFile.length()} bytes")
             return recordingFile
         } catch (e: IOException) {
             Log.e(tag, "Failed to save recording for speaker $speakerId", e)

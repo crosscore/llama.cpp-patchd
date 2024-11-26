@@ -15,6 +15,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.io.File
+import java.util.Date
 
 class VoskViewModel(
     application: Application,
@@ -49,8 +51,7 @@ class VoskViewModel(
     var currentSpeakerConfidence by mutableStateOf<Float?>(null)
         private set
 
-    var registeredSpeakers by mutableStateOf(emptyList<String>())
-        private set
+    private var registeredSpeakers by mutableStateOf(emptyList<String>())
 
     // 話者登録状態を追加
     var registrationState by mutableStateOf<RegistrationState>(RegistrationState.Idle)
@@ -66,6 +67,14 @@ class VoskViewModel(
 
     init {
         initializeModel()
+    }
+
+    fun getApplication(): Application {
+        return appContext
+    }
+
+    fun getRecordedAudioDataSize(): Int {
+        return temporaryRecording.size
     }
 
     private fun initializeModel() {
@@ -148,8 +157,6 @@ class VoskViewModel(
         }
     }
 
-    private var currentRecordingMode = RecordingMode.Recognition
-
     // 話者データのストレージ
     private val speakerStorage = SpeakerStorage.getInstance(application)
 
@@ -222,7 +229,6 @@ class VoskViewModel(
             try {
                 recordingJob?.cancelAndJoin()
             } catch (e: Exception) {
-                // キャンセル時の例外は無視
                 Log.d(tag, "Recording job cancelled", e)
             } finally {
                 if (_isRecording.value) {
@@ -230,6 +236,11 @@ class VoskViewModel(
                     isRecording = false
                     audioRecorder.stopRecording()
                     voskRecognizer.stopListening()
+
+                    // 登録モード時は録音完了状態にする
+                    if (registrationState is RegistrationState.Recording) {
+                        registrationState = RegistrationState.Idle
+                    }
                 }
                 recordingJob = null
             }
@@ -248,55 +259,91 @@ class VoskViewModel(
         return temporaryRecording.toShortArray()
     }
 
-    private fun debugSaveAudioData(speakerId: String) {
+    /**
+     * 話者の登録処理
+     */
+    fun registerSpeaker(speakerId: String, speakerName: String) {
+        viewModelScope.launch {
+            try {
+                registrationState = RegistrationState.Processing
+                Log.d(tag, "Starting speaker registration for ID: $speakerId")
+
+                val audioData = getRecordedAudioData()
+                Log.d(tag, "Recorded audio data size: ${audioData.size} samples")
+
+                if (audioData.isEmpty()) {
+                    Log.e(tag, "No audio data available for registration")
+                    registrationState = RegistrationState.Error("No audio data available")
+                    return@launch
+                }
+
+                // デバッグ用に録音データを保存
+                debugSaveAudioData(speakerId)
+
+                // 保存前にディレクトリ存在確認
+                val storage = speakerStorage
+                val baseDir = appContext.getExternalFilesDir(null)
+                Log.d(tag, "Base directory: ${baseDir?.absolutePath}")
+                val speakerDataDir = File(baseDir, "speaker_data")
+                Log.d(tag, "Speaker data directory exists: ${speakerDataDir.exists()}")
+
+                try {
+                    val recordingFile = storage.saveSpeakerRecording(speakerId, audioData)
+                    Log.d(tag, "Audio data saved to: ${recordingFile.absolutePath}")
+
+                    // 特徴ベクトルの抽出と保存
+                    val embedding = speakerIdentifier.extractEmbedding(audioData)
+                    if (embedding != null) {
+                        val embeddingFile = storage.saveSpeakerEmbedding(speakerId, embedding)
+                        Log.d(tag, "Embedding saved to: ${embeddingFile.absolutePath}")
+
+                        // メタデータの保存
+                        val metadata = SpeakerStorage.SpeakerMetadata(
+                            id = speakerId,
+                            name = speakerName,
+                            registrationDate = Date(),
+                            samplePath = recordingFile.absolutePath,
+                            embeddingPath = embeddingFile.absolutePath
+                        )
+                        storage.saveSpeakerMetadata(metadata)
+                        Log.d(tag, "Speaker metadata saved successfully")
+
+                        registrationState = RegistrationState.Success(speakerId)
+                        refreshRegisteredSpeakers()
+                    } else {
+                        Log.e(tag, "Failed to extract embedding for speaker $speakerId")
+                        registrationState = RegistrationState.Error("Failed to extract speaker embedding")
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error saving speaker data", e)
+                    registrationState = RegistrationState.Error("Failed to save speaker data: ${e.message}")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error registering speaker", e)
+                registrationState = RegistrationState.Error(e.message ?: "Unknown error")
+            }
+        }
+    }
+
+    /**
+     * デバッグ用の録音データ保存機能
+     */
+    fun debugSaveAudioData(speakerId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val audioData = getRecordedAudioData()
                 if (audioData.isNotEmpty()) {
                     val storage = SpeakerStorage.getInstance(appContext)
                     val file = storage.saveSpeakerRecording(speakerId, audioData)
-                    Log.d(tag, "Saved audio data to: ${file.absolutePath}")
-
-                    // 保存したファイルの情報を確認
-                    Log.d(tag, "File exists: ${file.exists()}")
-                    Log.d(tag, "File size: ${file.length()} bytes")
+                    Log.d(tag, "Debug: Saved audio data to: ${file.absolutePath}")
+                    Log.d(tag, "Debug: File exists: ${file.exists()}")
+                    Log.d(tag, "Debug: File size: ${file.length()} bytes")
                 } else {
-                    Log.w(tag, "No audio data available to save")
+                    Log.w(tag, "Debug: No audio data available to save")
                 }
             } catch (e: Exception) {
-                Log.e(tag, "Failed to save audio data", e)
+                Log.e(tag, "Debug: Failed to save audio data", e)
             }
-        }
-    }
-
-    fun registerSpeaker(speakerId: String, speakerName: String): Boolean {
-        return try {
-            registrationState = RegistrationState.Processing
-
-            val audioData = getRecordedAudioData()
-            if (audioData.isEmpty()) {
-                registrationState = RegistrationState.Error("No audio data available for registration")
-                return false
-            }
-
-            // デバッグ用に音声データを保存
-            debugSaveAudioData(speakerId)
-
-            // VoskRecognizer を使って話者を登録
-            val success = voskRecognizer.registerSpeaker(speakerId, speakerName, audioData)
-
-            if (success) {
-                registrationState = RegistrationState.Success(speakerId)
-                refreshRegisteredSpeakers()
-                true
-            } else {
-                registrationState = RegistrationState.Error("Failed to register speaker")
-                false
-            }
-        } catch (e: Exception) {
-            Log.e(tag, "Error registering speaker", e)
-            registrationState = RegistrationState.Error(e.message ?: "Unknown error")
-            false
         }
     }
 

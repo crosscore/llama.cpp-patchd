@@ -75,18 +75,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkSpeakerData() {
-        viewModel.voskViewModel?.let { voskViewModel ->
-            val baseDir = getExternalFilesDir(null)
-            val speakerDataDir = File(baseDir, "speaker_data")
+        val baseDir = getExternalFilesDir(null)
+        val speakerDataDir = File(baseDir, "speaker_data")
 
-            Log.d("SpeakerData", "Base directory: ${baseDir?.absolutePath}")
-            Log.d("SpeakerData", "Speaker data exists: ${speakerDataDir.exists()}")
+        Log.d("SpeakerData", "Base directory: ${baseDir?.absolutePath}")
+        Log.d("SpeakerData", "Speaker data exists: ${speakerDataDir.exists()}")
 
-            if (speakerDataDir.exists()) {
-                Log.d("SpeakerData", "Speaker data contents:")
-                speakerDataDir.walk().forEach { file ->
-                    Log.d("SpeakerData", "- ${baseDir?.let { file.relativeTo(it).path }}")
-                }
+        if (speakerDataDir.exists()) {
+            Log.d("SpeakerData", "Speaker data contents:")
+            speakerDataDir.walk().forEach { file ->
+                Log.d("SpeakerData", "- ${baseDir?.let { file.relativeTo(it).path }} (${file.length()} bytes)")
             }
         }
     }

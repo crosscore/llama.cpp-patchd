@@ -3,15 +3,24 @@ package com.example.llama
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.util.Log
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.text.*
 
 @Composable
@@ -94,6 +103,15 @@ fun SpeakerManagementDialog(
     currentConfidence: Float?,
     onRegisterNewSpeaker: () -> Unit
 ) {
+    var selectedSpeakerId by remember { mutableStateOf<String?>(null) }
+    val speakerMetadata = remember { mutableStateOf(listOf<SpeakerStorage.SpeakerMetadata>()) }
+
+    // メタデータの読み込み
+    LaunchedEffect(Unit) {
+        val storage = SpeakerStorage.getInstance(viewModel.getApplication())
+        speakerMetadata.value = storage.getAllSpeakerMetadata()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Speaker Management") },
@@ -102,53 +120,147 @@ fun SpeakerManagementDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                // 現在認識中の話者情報表示
-                if (currentSpeakerId != null && currentConfidence != null) {
-                    Card(
+                // 現在の認識状態
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Column(
                         modifier = Modifier
+                            .padding(16.dp)
                             .fillMaxWidth()
-                            .padding(bottom = 16.dp)
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(16.dp)
-                                .fillMaxWidth()
-                        ) {
-                            Text(
-                                "Current Speaker",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("ID: $currentSpeakerId")
-                            Text("Confidence: ${String.format("%.2f", currentConfidence)}")
+                        Text(
+                            "Current Recognition Status",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Speaker ID: ${currentSpeakerId ?: "Not detected"}")
+                        if (currentConfidence != null) {
+                            Text("Confidence: ${String.format("%.2f%%", currentConfidence * 100)}")
                         }
                     }
                 }
 
-                // 登録済み話者リスト
+                // 登録済み話者一覧
                 Text(
                     "Registered Speakers",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
-                LazyColumn(
-                    modifier = Modifier.heightIn(max = 200.dp)
-                ) {
-                    items(viewModel.registeredSpeakers) { speakerId ->
-                        ListItem(
-                            headlineContent = { Text(speakerId) },
-                            trailingContent = {
-                                IconButton(onClick = {
-                                    // TODO: 話者の削除機能を実装
-                                }) {
-                                    // TODO: 削除アイコンを追加
+
+                // 登録済み話者の詳細表示
+                speakerMetadata.value.forEach { metadata ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clickable {
+                                selectedSpeakerId = if (selectedSpeakerId == metadata.id) null else metadata.id
+                            }
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        metadata.name,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "ID: ${metadata.id}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        // TODO: 話者の削除機能を実装
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete speaker"
+                                    )
                                 }
                             }
+
+                            // 選択された話者の詳細情報
+                            if (selectedSpeakerId == metadata.id) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                HorizontalDivider()
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    "Registration Date: ${
+                                        SimpleDateFormat(
+                                            "yyyy-MM-dd HH:mm:ss",
+                                            Locale.getDefault()
+                                        ).format(metadata.registrationDate)
+                                    }",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    "Sample File: ${metadata.samplePath}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                                Text(
+                                    "Embedding File: ${metadata.embeddingPath}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // デバッグ情報
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text(
+                            "Debug Information",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
-                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Base Directory: ${viewModel.getApplication().getExternalFilesDir(null)?.absolutePath}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Speaker Data Directory: ${
+                                viewModel.getApplication().getExternalFilesDir(null)?.let {
+                                    File(it, "speaker_data").absolutePath
+                                }
+                            }",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Recording State: ${if (viewModel.isRecording) "Recording" else "Stopped"}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            "Registration State: ${viewModel.registrationState}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -177,15 +289,22 @@ fun SpeakerRegistrationDialog(
     var speakerId by remember { mutableStateOf("") }
     var speakerName by remember { mutableStateOf("") }
     var recordingDuration by remember { mutableIntStateOf(0) }
+    var finalRecordingDuration by remember { mutableIntStateOf(0) }
     var showError by remember { mutableStateOf<String?>(null) }
+    val recordingPath by remember { mutableStateOf<String?>(null) }
 
-    // 録音時間を更新するための LaunchedEffect
+    // 録音時間を更新
     LaunchedEffect(isRecording) {
-        recordingDuration = 0
         if (isRecording) {
+            recordingDuration = 0
             while (true) {
                 delay(1000)
                 recordingDuration++
+            }
+        } else {
+            // 録音停止時に最終時間を保存
+            if (recordingDuration > 0) {
+                finalRecordingDuration = recordingDuration
             }
         }
     }
@@ -204,11 +323,13 @@ fun SpeakerRegistrationDialog(
         }
     }
 
+    val canRegister = !isRecording && recordingDuration > 0 && speakerId.isNotBlank() && speakerName.isNotBlank()
+
     AlertDialog(
         onDismissRequest = {
             if (!isRecording) onDismiss()
         },
-        title = { Text("話者の登録") },
+        title = { Text("Register New Speaker") },
         text = {
             Column(
                 modifier = Modifier
@@ -218,7 +339,7 @@ fun SpeakerRegistrationDialog(
                 OutlinedTextField(
                     value = speakerId,
                     onValueChange = { speakerId = it },
-                    label = { Text("話者ID") },
+                    label = { Text("Speaker ID") },
                     enabled = !isRecording,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -228,14 +349,14 @@ fun SpeakerRegistrationDialog(
                 OutlinedTextField(
                     value = speakerName,
                     onValueChange = { speakerName = it },
-                    label = { Text("話者名") },
+                    label = { Text("Speaker Name") },
                     enabled = !isRecording,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp)
                 )
 
-                // 録音状態の表示
+                // 録音状態表示
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -247,7 +368,7 @@ fun SpeakerRegistrationDialog(
                             .fillMaxWidth()
                     ) {
                         Text(
-                            "録音状態",
+                            "Recording Status",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -256,7 +377,7 @@ fun SpeakerRegistrationDialog(
                         when {
                             isRecording -> {
                                 Text(
-                                    "録音中... ${recordingDuration}秒",
+                                    "Recording in progress... ${recordingDuration}s",
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 LinearProgressIndicator(
@@ -266,7 +387,7 @@ fun SpeakerRegistrationDialog(
                                 )
                             }
                             registrationState is VoskViewModel.RegistrationState.Processing -> {
-                                Text("処理中...")
+                                Text("Processing...")
                                 LinearProgressIndicator(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -274,8 +395,72 @@ fun SpeakerRegistrationDialog(
                                 )
                             }
                             else -> {
-                                Text(if (recordingDuration > 0) "録音完了（${recordingDuration}秒）" else "録音待機中")
+                                Column {
+                                    Text(
+                                        if (recordingDuration > 0)
+                                            "Recording completed (${recordingDuration}s)"
+                                        else
+                                            "Waiting to start"
+                                    )
+
+                                    // デバッグ情報
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        "Debug Info:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "- Recording Status: Stopped",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "- Duration: ${recordingDuration}s",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "- Speaker ID: ${speakerId.ifBlank { "Empty" }}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "- Speaker Name: ${speakerName.ifBlank { "Empty" }}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        "- Registration State: $registrationState",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
+                        }
+
+                        // デバッグボタン
+                        if (recordingDuration > 0 && !isRecording) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    viewModel.debugSaveAudioData(speakerId)
+                                },
+                                enabled = speakerId.isNotBlank()
+                            ) {
+                                Text("Save Debug Recording")
+                            }
+                        }
+
+                        // 録音パスの表示（デバッグ用）
+                        recordingPath?.let { path ->
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                "Recording Path: $path",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -291,21 +476,35 @@ fun SpeakerRegistrationDialog(
             }
         },
         confirmButton = {
+            // ボタン活性化条件のデバッグ出力
+            LaunchedEffect(isRecording, recordingDuration, finalRecordingDuration, speakerId, speakerName) {
+                Log.d("SpeakerRegistration", """
+                    Register button state:
+                    - isRecording: $isRecording
+                    - recordingDuration: $recordingDuration
+                    - finalRecordingDuration: $finalRecordingDuration
+                    - speakerId: ${speakerId.isNotBlank()}
+                    - speakerName: ${speakerName.isNotBlank()}
+                    - canRegister: $canRegister
+                    """.trimIndent())
+            }
+
             Button(
                 onClick = {
                     if (speakerId.isBlank() || speakerName.isBlank()) {
-                        showError = "話者IDと話者名を入力してください"
+                        showError = "Please enter both Speaker ID and Name"
                         return@Button
                     }
                     if (recordingDuration == 0) {
-                        showError = "音声を録音してください"
+                        showError = "Please record a voice sample first"
                         return@Button
                     }
                     viewModel.registerSpeaker(speakerId, speakerName)
                 },
-                enabled = !isRecording && recordingDuration > 0
+                enabled = canRegister, // 単純化した条件
+                modifier = Modifier.padding(16.dp)
             ) {
-                Text("登録")
+                Text("Register")
             }
         },
         dismissButton = {
@@ -326,14 +525,14 @@ fun SpeakerRegistrationDialog(
                             MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(if (isRecording) "録音停止" else "録音開始")
+                    Text(if (isRecording) "Stop" else "Record")
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 Button(
                     onClick = onDismiss,
                     enabled = !isRecording
                 ) {
-                    Text("キャンセル")
+                    Text("Cancel")
                 }
             }
         }
