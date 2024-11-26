@@ -13,7 +13,7 @@
 #define TAG "llama-android.cpp"
 #define LOGi(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
-#define MAX_CONTEXT_SIZE 8192
+#define MAX_CONTEXT_SIZE 2048
 
 namespace {
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {

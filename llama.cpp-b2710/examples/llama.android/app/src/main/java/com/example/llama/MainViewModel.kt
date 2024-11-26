@@ -29,13 +29,13 @@ class MainViewModel(
     var currentModelPath: String? by mutableStateOf(null)
         private set
 
-    var maxTokens by mutableIntStateOf(512)
+    var maxTokens by mutableIntStateOf(256)
         private set
 
     var seed by mutableIntStateOf(42)
         private set
 
-    var contextSize by mutableIntStateOf(2048)
+    var contextSize by mutableIntStateOf(1024)
         private set
 
     var numThreads by mutableIntStateOf(4)
@@ -112,7 +112,7 @@ class MainViewModel(
     }
 
     fun updateMaxTokens(newMaxTokens: String) {
-        val requestedTokens = newMaxTokens.toIntOrNull() ?: 512
+        val requestedTokens = newMaxTokens.toIntOrNull() ?: 256
         maxTokens = minOf(requestedTokens, contextSize)
     }
 
@@ -121,9 +121,9 @@ class MainViewModel(
     }
 
     fun updateContextSize(newContextSize: String) {
-        val requestedSize = newContextSize.toIntOrNull() ?: 2048
-        // 8192を超えないようにする
-        contextSize = minOf(requestedSize, 8192)
+        val requestedSize = newContextSize.toIntOrNull() ?: 1024
+        // 2048を超えないようにする
+        contextSize = minOf(requestedSize, 2048)
         maxTokens = minOf(maxTokens, contextSize)
     }
 
