@@ -43,7 +43,6 @@ class SpeakerIdentifier private constructor(application: Application) {
     private val speakerProfiles = mutableMapOf<String, SpeakerProfile>()
 
     companion object {
-        const val SPEAKER_MODEL_NAME = "vosk-model-spk-0.4"
         private const val SIMILARITY_THRESHOLD = 0.7f
         private const val SAMPLE_RATE = 16000f
 
@@ -84,9 +83,9 @@ class SpeakerIdentifier private constructor(application: Application) {
                 ?: throw IllegalStateException("External storage is not available")
 
             // 音声認識モデルのパス
-            val modelPath = File(modelDir, "vosk-model-small-ja-0.22").absolutePath
+            val modelPath = File(modelDir, VoskRecognizer.VOSK_MODEL_NAME).absolutePath
             // 話者識別モデルのパス
-            val speakerModelPath = File(modelDir, SPEAKER_MODEL_NAME).absolutePath
+            val speakerModelPath = File(modelDir, VoskRecognizer.SPEAKER_MODEL_NAME).absolutePath
 
             if (!File(speakerModelPath).exists()) {
                 Log.e(tag, "Speaker model not found at $speakerModelPath")

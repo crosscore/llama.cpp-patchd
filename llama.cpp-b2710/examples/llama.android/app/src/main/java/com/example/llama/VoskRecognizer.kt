@@ -256,10 +256,9 @@ class VoskRecognizer private constructor(private val context: Context) {
                 instance ?: VoskRecognizer(context).also { instance = it }
             }
         }
-
-        // デフォルトのモデル名
-        const val DEFAULT_MODEL_NAME = "vosk-model-small-ja-0.22"
-        // 話者識別モデル名
+        // VOSKのモデルのフォルダ名
+        const val VOSK_MODEL_NAME = "vosk-model-small-ja-0.22"
+        // 話者識別モデルのフォルダ名
         const val SPEAKER_MODEL_NAME = "vosk-model-spk-0.4"
     }
 }

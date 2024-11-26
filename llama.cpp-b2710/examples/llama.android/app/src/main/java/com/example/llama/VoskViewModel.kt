@@ -81,7 +81,7 @@ class VoskViewModel(
         viewModelScope.launch {
             try {
                 if (!isModelInitialized) {
-                    val modelName = VoskRecognizer.DEFAULT_MODEL_NAME
+                    val modelName = VoskRecognizer.VOSK_MODEL_NAME
                     if (voskRecognizer.isModelAvailable(modelName)) {
                         isModelInitialized = voskRecognizer.initModel(modelName)
                         if (isModelInitialized) {

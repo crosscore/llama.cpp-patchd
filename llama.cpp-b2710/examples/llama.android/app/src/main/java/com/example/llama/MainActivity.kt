@@ -242,7 +242,7 @@ class MainActivity : ComponentActivity() {
         val extFilesDir = getExternalFilesDir(null)
 
         val downloadedModels = extFilesDir?.listFiles { file ->
-            file.isFile && (file.extension == "gguf" || file.name == VoskRecognizer.DEFAULT_MODEL_NAME)
+            file.isFile && (file.extension == "gguf" || file.name == VoskRecognizer.VOSK_MODEL_NAME)
         }?.map { file ->
             Downloadable(
                 file.name,
@@ -259,12 +259,6 @@ class MainActivity : ComponentActivity() {
                 File(extFilesDir, "phi-2-dpo.Q3_K_M.gguf"),
                 sha256 = "e7effd3e3a3b6f1c05b914deca7c9646210bad34576d39d3c5c5f2a25cb97ae1"
             ),
-            Downloadable(
-                VoskRecognizer.DEFAULT_MODEL_NAME,
-                Uri.parse("https://alphacephei.com/vosk/models/vosk-model-small-ja-0.22.zip"),
-                File(extFilesDir, VoskRecognizer.DEFAULT_MODEL_NAME),
-                sha256 = ""
-            )
         )
 
         models.clear()
