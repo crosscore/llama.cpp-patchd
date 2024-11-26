@@ -449,7 +449,8 @@ Java_com_example_llama_Llm_completion_1loop(
     if (new_token_id == 32766) {
         LOGi("Token[%d] -> '\\n\\n' (double newline detected)", new_token_id);
         return env->NewStringUTF("<CONVERSATION_END>");
-    } else if (new_token_id == 212) {
+    }
+    if (new_token_id == 212) {
         LOGi("Token[%d] -> '\\n'", new_token_id);
     }
 
