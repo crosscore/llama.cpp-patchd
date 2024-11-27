@@ -96,53 +96,58 @@ class ConversationHistoryStorage private constructor(context: Context) {
         }
     }
 
+    // すべてのセッションから最新の会話履歴を取得
     fun getRecentEntries(limit: Int = 5): List<ConversationEntry> {
-        return try {
-            Log.d(tag, "Current session path: ${getCurrentSessionPath()}")
+        try {
+            Log.d(tag, "Reading conversation history from: ${conversationDir.absolutePath}")
 
-            currentSessionFile?.let { file ->
-                if (!file.exists()) {
-                    Log.d(tag, "Session file does not exist")
-                    return emptyList()
+            // すべてのセッションディレクトリを取得し、名前で降順ソート（最新のものから）
+            val sessionDirs = conversationDir.listFiles { file ->
+                file.isDirectory
+            }?.sortedByDescending { it.name } ?: return emptyList()
+
+            Log.d(tag, "Found ${sessionDirs.size} session directories")
+
+            // 全セッションの会話履歴を統合
+            val allEntries = mutableListOf<ConversationEntry>()
+
+            for (sessionDir in sessionDirs) {
+                val conversationFile = File(sessionDir, "conversation.json")
+                if (conversationFile.exists() && conversationFile.length() > 0) {
+                    try {
+                        Log.d(tag, "Reading from session: ${sessionDir.name}")
+                        val fileContent = conversationFile.readText()
+                        val jsonArray = JSONArray(fileContent)
+
+                        for (i in 0 until jsonArray.length()) {
+                            val json = jsonArray.getJSONObject(i)
+                            allEntries.add(
+                                ConversationEntry(
+                                    speakerId = json.getString("speakerId"),
+                                    speakerName = json.getString("speakerName"),
+                                    message = json.getString("message"),
+                                    timestamp = json.getLong("timestamp"),
+                                    confidence = json.getDouble("confidence").toFloat()
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error reading session ${sessionDir.name}", e)
+                    }
                 }
-
-                if (file.length() == 0L) {
-                    Log.d(tag, "Session file is empty")
-                    return emptyList()
-                }
-
-                val fileContent = file.readText()
-                Log.d(tag, "File content: $fileContent")
-
-                val jsonArray = JSONArray(fileContent)
-                val entries = mutableListOf<ConversationEntry>()
-
-                for (i in (jsonArray.length() - 1) downTo maxOf(0, jsonArray.length() - limit)) {
-                    val json = jsonArray.getJSONObject(i)
-                    entries.add(
-                        ConversationEntry(
-                            speakerId = json.getString("speakerId"),
-                            speakerName = json.getString("speakerName"),
-                            message = json.getString("message"),
-                            timestamp = json.getLong("timestamp"),
-                            confidence = json.getDouble("confidence").toFloat()
-                        )
-                    )
-                }
-
-                Log.d(tag, "Loaded ${entries.size} entries")
-                entries.reversed()
-            } ?: run {
-                Log.d(tag, "Current session file is null")
-                emptyList()
             }
+
+            // タイムスタンプでソートし、指定された数だけ返す
+            return allEntries
+                .sortedBy { it.timestamp }
+                .takeLast(limit)
+                .also {
+                    Log.d(tag, "Returning ${it.size} entries from all sessions")
+                }
+
         } catch (e: Exception) {
             Log.e(tag, "Failed to get recent entries", e)
-            emptyList()
+            return emptyList()
         }
-    }
-
-    private fun getCurrentSessionPath(): String? {
-        return currentSessionFile?.absolutePath
     }
 }
