@@ -260,8 +260,9 @@ class VoskViewModel(
     }
 
     /**
-     * 話者の登録処理
-     */
+     * UIから呼び出される話者登録処理
+     * 登録状態の管理とVoskRecognizerを使用した実際の登録を行う
+    */
     fun registerSpeaker(speakerId: String, speakerName: String) {
         viewModelScope.launch {
             try {
@@ -269,54 +270,17 @@ class VoskViewModel(
                 Log.d(tag, "Starting speaker registration for ID: $speakerId")
 
                 val audioData = getRecordedAudioData()
-                Log.d(tag, "Recorded audio data size: ${audioData.size} samples")
-
                 if (audioData.isEmpty()) {
-                    Log.e(tag, "No audio data available for registration")
                     registrationState = RegistrationState.Error("No audio data available")
                     return@launch
                 }
 
-                // デバッグ用に録音データを保存
-                debugSaveAudioData(speakerId)
-
-                // 保存前にディレクトリ存在確認
-                val storage = speakerStorage
-                val baseDir = appContext.getExternalFilesDir(null)
-                Log.d(tag, "Base directory: ${baseDir?.absolutePath}")
-                val speakerDataDir = File(baseDir, "speaker_data")
-                Log.d(tag, "Speaker data directory exists: ${speakerDataDir.exists()}")
-
-                try {
-                    val recordingFile = storage.saveSpeakerRecording(speakerId, audioData)
-                    Log.d(tag, "Audio data saved to: ${recordingFile.absolutePath}")
-
-                    // 特徴ベクトルの抽出と保存
-                    val embedding = speakerIdentifier.extractEmbedding(audioData)
-                    if (embedding != null) {
-                        val embeddingFile = storage.saveSpeakerEmbedding(speakerId, embedding)
-                        Log.d(tag, "Embedding saved to: ${embeddingFile.absolutePath}")
-
-                        // メタデータの保存
-                        val metadata = SpeakerStorage.SpeakerMetadata(
-                            id = speakerId,
-                            name = speakerName,
-                            registrationDate = Date(),
-                            samplePath = recordingFile.absolutePath,
-                            embeddingPath = embeddingFile.absolutePath
-                        )
-                        storage.saveSpeakerMetadata(metadata)
-                        Log.d(tag, "Speaker metadata saved successfully")
-
-                        registrationState = RegistrationState.Success(speakerId)
-                        refreshRegisteredSpeakers()
-                    } else {
-                        Log.e(tag, "Failed to extract embedding for speaker $speakerId")
-                        registrationState = RegistrationState.Error("Failed to extract speaker embedding")
-                    }
-                } catch (e: Exception) {
-                    Log.e(tag, "Error saving speaker data", e)
-                    registrationState = RegistrationState.Error("Failed to save speaker data: ${e.message}")
+                val success = voskRecognizer.registerSpeaker(speakerId, speakerName, audioData)
+                if (success) {
+                    registrationState = RegistrationState.Success(speakerId)
+                    refreshRegisteredSpeakers()
+                } else {
+                    registrationState = RegistrationState.Error("Registration failed")
                 }
             } catch (e: Exception) {
                 Log.e(tag, "Error registering speaker", e)

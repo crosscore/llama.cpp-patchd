@@ -97,7 +97,7 @@ class VoskRecognizer private constructor(private val context: Context) {
 
     /**
      * モデルの初期化
-     * @param modelName モデルのディレクトリ名（例: "vosk-model-small-ja-0.22"）
+     * @param modelName モデルのディレクトリ名
      * @return 初期化が成功したかどうか
      */
     fun initModel(modelName: String): Boolean {
@@ -245,8 +245,13 @@ class VoskRecognizer private constructor(private val context: Context) {
     }
 
     /**
-     * 新しい話者の登録
-     */
+     * 話者登録の実際の処理を行う
+     * 音声データから特徴ベクトルを抽出し、ストレージに保存する
+     * @param id 登録する話者のID
+     * @param name 登録する話者の名前
+     * @param audioData 話者の音声データ
+     * @return 登録が成功したかどうか
+    */
     fun registerSpeaker(id: String, name: String, audioData: ShortArray): Boolean {
         return try {
             speakerIdentifier?.let { identifier ->
