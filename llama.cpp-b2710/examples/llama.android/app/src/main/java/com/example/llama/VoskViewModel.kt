@@ -71,10 +71,6 @@ class VoskViewModel(
         return appContext
     }
 
-    fun getRecordedAudioDataSize(): Int {
-        return temporaryRecording.size
-    }
-
     private fun initializeModel() {
         viewModelScope.launch {
             try {
@@ -313,11 +309,6 @@ class VoskViewModel(
     fun startRegistrationRecording() {
         registrationState = RegistrationState.Recording
         startRecording(RecordingMode.Registration)
-    }
-
-    fun stopRegistrationRecording() {
-        stopRecording()
-        registrationState = RegistrationState.Idle
     }
 
     // 登録済み話者リストの更新
