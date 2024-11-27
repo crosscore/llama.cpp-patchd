@@ -105,11 +105,44 @@ fun SpeakerManagementDialog(
 ) {
     var selectedSpeakerId by remember { mutableStateOf<String?>(null) }
     val speakerMetadata = remember { mutableStateOf(listOf<SpeakerStorage.SpeakerMetadata>()) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
 
     // メタデータの読み込み
     LaunchedEffect(Unit) {
         val storage = SpeakerStorage.getInstance(viewModel.getApplication())
         speakerMetadata.value = storage.getAllSpeakerMetadata()
+    }
+
+    // 削除確認ダイアログ
+    showDeleteConfirmation?.let { speakerId ->
+        val speaker = speakerMetadata.value.find { it.id == speakerId }
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("話者の削除") },
+            text = { Text("「${speaker?.name ?: speakerId}」を削除してもよろしいですか？") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val storage = SpeakerStorage.getInstance(viewModel.getApplication())
+                        if (storage.deleteSpeaker(speakerId)) {
+                            // 削除成功時、リストを更新
+                            speakerMetadata.value = storage.getAllSpeakerMetadata()
+                        }
+                        showDeleteConfirmation = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteConfirmation = null }) {
+                    Text("キャンセル")
+                }
+            }
+        )
     }
 
     AlertDialog(
@@ -187,7 +220,7 @@ fun SpeakerManagementDialog(
                                 }
                                 IconButton(
                                     onClick = {
-                                        // TODO: 話者の削除機能を実装
+                                        showDeleteConfirmation = metadata.id
                                     }
                                 ) {
                                     Icon(

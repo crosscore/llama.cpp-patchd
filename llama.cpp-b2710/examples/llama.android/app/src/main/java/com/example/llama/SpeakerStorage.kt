@@ -188,50 +188,6 @@ class SpeakerStorage private constructor(context: Context) {
         }
     }
 
-    /**
-     * 特定の話者のメタデータを取得
-     */
-    private fun getSpeakerMetadata(speakerId: String): SpeakerMetadata? {
-        return getAllSpeakerMetadata().find { it.id == speakerId }
-    }
-
-    /**
-     * 話者の録音データを読み込み
-     */
-    fun loadSpeakerRecording(speakerId: String): ShortArray? {
-        val metadata = getSpeakerMetadata(speakerId) ?: return null
-        val recordingFile = File(metadata.samplePath)
-
-        return try {
-            val bytes = recordingFile.readBytes()
-            ShortArray(bytes.size / 2) { i ->
-                ((bytes[i * 2 + 1].toInt() and 0xFF) shl 8 or
-                    (bytes[i * 2].toInt() and 0xFF)).toShort()
-            }
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to load recording for speaker $speakerId", e)
-            null
-        }
-    }
-
-    /**
-     * 話者の特徴ベクトルを読み込み
-     */
-    fun loadSpeakerEmbedding(speakerId: String): FloatArray? {
-        val metadata = getSpeakerMetadata(speakerId) ?: return null
-        val embeddingFile = File(metadata.embeddingPath)
-
-        return try {
-            val jsonArray = JSONArray(embeddingFile.readText())
-            FloatArray(jsonArray.length()) { i ->
-                jsonArray.getDouble(i).toFloat()
-            }
-        } catch (e: Exception) {
-            Log.e(tag, "Failed to load embedding for speaker $speakerId", e)
-            null
-        }
-    }
-
     private fun createMetadataJson(metadata: SpeakerMetadata): JSONObject {
         return JSONObject().apply {
             put("id", metadata.id)
