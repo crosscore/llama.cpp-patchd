@@ -40,7 +40,6 @@ class SpeakerIdentifier private constructor(application: Application) {
     private val speakerProfiles = mutableMapOf<String, SpeakerProfile>()
 
     companion object {
-        private const val SIMILARITY_THRESHOLD = 0.7f
         private const val SAMPLE_RATE = 16000f
 
         @Volatile
@@ -154,10 +153,10 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
 
         var bestMatch: Pair<String, Float>? = null
+
         speakerProfiles.forEach { (id, profile) ->
             val similarity = cosineSimilarity(embedding, profile.embedding)
-            if (similarity > SIMILARITY_THRESHOLD &&
-                (bestMatch == null || similarity > bestMatch!!.second)) {
+            if (bestMatch == null || similarity > bestMatch!!.second) {
                 bestMatch = Pair(id, similarity)
             }
         }
