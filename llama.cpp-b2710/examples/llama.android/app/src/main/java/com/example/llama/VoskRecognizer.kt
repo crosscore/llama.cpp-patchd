@@ -156,6 +156,30 @@ class VoskRecognizer private constructor(private val context: Context) {
     }
 
     /**
+     * 音声データの追加（話者識別用のバッファリングのみ）
+     */
+    fun addAudioData(audioData: ShortArray) {
+        try {
+            // バッファサイズの確認
+            if (audioData.isEmpty()) {
+                Log.w(tag, "Empty audio data received")
+                return
+            }
+
+            // 話者識別用のバッファ処理のみを行う
+            audioBuffer.addAll(audioData.toList())
+            if (audioBuffer.size >= speakerBufferSize) {
+                val bufferData = audioBuffer.toShortArray()
+                audioBuffer.clear()
+                performSpeakerIdentification(bufferData)
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error in addAudioData", e)
+            onError?.invoke(e)
+        }
+    }
+
+    /**
      * 音声認識の停止
      */
     fun stopListening() {
@@ -164,19 +188,6 @@ class VoskRecognizer private constructor(private val context: Context) {
             service.shutdown()
             speechService = null
             Log.i(tag, "Stopped listening")
-        }
-    }
-
-    /**
-     * 音声データの追加と話者識別
-     */
-    fun addAudioData(audioData: ShortArray) {
-        audioBuffer.addAll(audioData.toList())
-
-        // バッファが一定サイズを超えたら話者識別を実行
-        if (audioBuffer.size >= speakerBufferSize) {
-            performSpeakerIdentification(audioBuffer.toShortArray())
-            audioBuffer.clear()
         }
     }
 
