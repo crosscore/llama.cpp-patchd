@@ -40,6 +40,31 @@ class VoskRecognizer private constructor(private val context: Context) {
     private val audioBuffer = mutableListOf<Short>()
     private val speakerBufferSize = 16000 * 5 // 5秒分のオーディオデータ
 
+    // SpeakerStorageのインスタンス
+    private val speakerStorage by lazy {
+        SpeakerStorage.getInstance(context)
+    }
+
+    // ConversationHistoryStorageのインスタンス
+    private val conversationStorage by lazy {
+        ConversationHistoryStorage.getInstance(context)
+    }
+
+    // 現在の話者識別の信頼度
+    private var currentSpeakerConfidence: Float? = null
+
+    // 会話履歴の更新メソッド
+    private fun updateRecentConversations() {
+        // conversationStorageから最新のエントリを取得
+        conversationStorage.getRecentEntries().also { entries ->
+            // ViewModelなどに通知するためのコールバックがあれば実行
+            onConversationsUpdated?.invoke(entries)
+        }
+    }
+
+    // 会話履歴更新時のコールバック
+    var onConversationsUpdated: ((List<ConversationHistoryStorage.ConversationEntry>) -> Unit)? = null
+
     private val recognitionListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
             onPartialResult?.invoke(hypothesis)
@@ -190,6 +215,9 @@ class VoskRecognizer private constructor(private val context: Context) {
 
         recognizer?.let { rec ->
             try {
+                // 新しいセッションを開始
+                conversationStorage.startNewSession()
+
                 speechService = SpeechService(rec, 16000.0f)
                 speechService?.startListening(recognitionListener)
                 Log.i(tag, "Started listening")
