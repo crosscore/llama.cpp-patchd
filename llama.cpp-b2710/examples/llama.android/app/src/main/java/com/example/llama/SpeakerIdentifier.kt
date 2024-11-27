@@ -13,13 +13,11 @@ import java.lang.ref.WeakReference
 class SpeakerIdentifier private constructor(application: Application) {
     private val tag = "SpeakerIdentifier"
     private var speakerModel: SpeakerModel? = null
-    private var recognizer: Recognizer? = null
+    private var speakerRecognizer: Recognizer? = null
     private var model: Model? = null
 
-    // WeakReferenceを使用してApplicationコンテキストを保持
     private val contextRef = WeakReference(application)
 
-    // スピーカープロファイルを保存するためのデータクラス
     data class SpeakerProfile(
         val id: String,
         val name: String,
@@ -39,7 +37,6 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    // 登録済みのスピーカープロファイル
     private val speakerProfiles = mutableMapOf<String, SpeakerProfile>()
 
     companion object {
@@ -50,19 +47,11 @@ class SpeakerIdentifier private constructor(application: Application) {
         private var instance: SpeakerIdentifier? = null
 
         fun getInstance(context: Context): SpeakerIdentifier {
-            if (instance == null) {
-                synchronized(this) {
-                    if (instance == null) {
-                        // コンテキストがApplicationでない場合はApplicationコンテキストを取得
-                        val applicationContext = context.applicationContext
-                        if (applicationContext !is Application) {
-                            throw IllegalArgumentException("Context must be an Application context")
-                        }
-                        instance = SpeakerIdentifier(applicationContext)
-                    }
+            return instance ?: synchronized(this) {
+                instance ?: SpeakerIdentifier(context.applicationContext as Application).also {
+                    instance = it
                 }
             }
-            return instance!!
         }
 
         fun cleanup() {
@@ -73,18 +62,14 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    /**
-     * 話者識別モデルの初期化
-     */
+    @Synchronized
     fun initModel(): Boolean {
         return try {
             val context = contextRef.get() ?: throw IllegalStateException("Context has been garbage collected")
             val modelDir = context.getExternalFilesDir(null)
                 ?: throw IllegalStateException("External storage is not available")
 
-            // 音声認識モデルのパス
             val modelPath = File(modelDir, VoskRecognizer.VOSK_MODEL_NAME).absolutePath
-            // 話者識別モデルのパス
             val speakerModelPath = File(modelDir, VoskRecognizer.SPEAKER_MODEL_NAME).absolutePath
 
             if (!File(speakerModelPath).exists()) {
@@ -92,12 +77,13 @@ class SpeakerIdentifier private constructor(application: Application) {
                 return false
             }
 
-            // 音声認識モデルの初期化
+            // 既存のリソースを解放
+            releaseResources()
+
+            // 専用の音声認識モデルと認識器を初期化
             model = Model(modelPath)
-            // 話者識別モデルの初期化
             speakerModel = SpeakerModel(speakerModelPath)
-            // 認識器の初期化（話者識別モデル付き）
-            recognizer = Recognizer(model!!, SAMPLE_RATE, speakerModel!!)
+            speakerRecognizer = Recognizer(model!!, SAMPLE_RATE, speakerModel!!)
 
             Log.i(tag, "Speaker identification model loaded successfully")
             true
@@ -107,25 +93,28 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    /**
-     * 音声データから話者の特徴ベクトルを抽出
-     */
+    @Synchronized
     fun extractEmbedding(audioData: ShortArray): FloatArray? {
         return try {
-            recognizer?.let { rec ->
-                // 音声データを供給
-                rec.acceptWaveForm(audioData, audioData.size)
-                // 結果を取得（JSON形式）
-                val result = rec.finalResult
-                // JSONから話者ベクトルを抽出
-                val json = JSONObject(result)
-                if (json.has("spk")) {
-                    val spkArray = json.getJSONArray("spk")
-                    FloatArray(spkArray.length()) { i ->
-                        spkArray.getDouble(i).toFloat()
+            speakerRecognizer?.let { rec ->
+                synchronized(rec) {
+                    // 音声データを正規化
+                    val normalizedData = normalizeAudioData(audioData)
+
+                    // 音声データを処理
+                    rec.acceptWaveForm(normalizedData, normalizedData.size)
+                    val result = rec.finalResult
+
+                    // 結果をパース
+                    val json = JSONObject(result)
+                    if (json.has("spk")) {
+                        val spkArray = json.getJSONArray("spk")
+                        FloatArray(spkArray.length()) { i ->
+                            spkArray.getDouble(i).toFloat()
+                        }
+                    } else {
+                        null
                     }
-                } else {
-                    null
                 }
             }
         } catch (e: Exception) {
@@ -134,18 +123,30 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    /**
-     * 新しい話者プロファイルの登録
-     */
+    private fun normalizeAudioData(audioData: ShortArray): ShortArray {
+        var sum = 0.0
+        audioData.forEach { sum += it }
+        val mean = sum / audioData.size
+
+        var maxAmp = 1.0
+        audioData.forEach {
+            val amp = kotlin.math.abs(it - mean)
+            if (amp > maxAmp) maxAmp = amp
+        }
+
+        return ShortArray(audioData.size) { i ->
+            ((audioData[i] - mean) * (32767.0 / maxAmp)).toInt().toShort()
+        }
+    }
+
+    @Synchronized
     fun registerSpeaker(id: String, name: String, embedding: FloatArray) {
         val profile = SpeakerProfile(id, name, embedding)
         speakerProfiles[id] = profile
         Log.i(tag, "Registered new speaker profile: $id ($name)")
     }
 
-    /**
-     * 話者の識別
-     */
+    @Synchronized
     fun identifySpeaker(embedding: FloatArray): Pair<String, Float>? {
         if (speakerProfiles.isEmpty()) {
             Log.w(tag, "No speaker profiles registered")
@@ -155,7 +156,8 @@ class SpeakerIdentifier private constructor(application: Application) {
         var bestMatch: Pair<String, Float>? = null
         speakerProfiles.forEach { (id, profile) ->
             val similarity = cosineSimilarity(embedding, profile.embedding)
-            if (similarity > SIMILARITY_THRESHOLD && (bestMatch == null || similarity > bestMatch!!.second)) {
+            if (similarity > SIMILARITY_THRESHOLD &&
+                (bestMatch == null || similarity > bestMatch!!.second)) {
                 bestMatch = Pair(id, similarity)
             }
         }
@@ -167,9 +169,6 @@ class SpeakerIdentifier private constructor(application: Application) {
         return bestMatch
     }
 
-    /**
-     * コサイン類似度の計算
-     */
     private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
         if (a.size != b.size) return 0f
         var dotProduct = 0f
@@ -187,22 +186,25 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    /**
-     * リソースの解放
-     */
-    fun release() {
+    @Synchronized
+    private fun releaseResources() {
         try {
-            recognizer?.close()
-            recognizer = null
+            speakerRecognizer?.close()
+            speakerRecognizer = null
             speakerModel?.close()
             speakerModel = null
             model?.close()
             model = null
-            speakerProfiles.clear()
-            contextRef.clear()
-            Log.i(tag, "Speaker identifier resources released")
         } catch (e: Exception) {
-            Log.e(tag, "Error releasing speaker identifier resources", e)
+            Log.e(tag, "Error releasing resources", e)
         }
+    }
+
+    @Synchronized
+    fun release() {
+        releaseResources()
+        speakerProfiles.clear()
+        contextRef.clear()
+        Log.i(tag, "Speaker identifier resources released")
     }
 }
