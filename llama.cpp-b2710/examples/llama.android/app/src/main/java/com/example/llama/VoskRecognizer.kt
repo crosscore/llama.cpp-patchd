@@ -7,7 +7,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
@@ -54,13 +53,62 @@ class VoskRecognizer private constructor(private val context: Context) {
                 if (text.isNotBlank()) {
                     onResult?.invoke(hypothesis)
 
-                    if (audioBuffer.size >= speakerBufferSize) {
-                        val audioData = audioBuffer.toShortArray()
-                        audioBuffer.clear()
+                    // 登録済みの話者を取得
+                    val registeredSpeakers = speakerStorage.getAllSpeakerMetadata()
 
-                        coroutineScope.launch(Dispatchers.IO) {
-                            performSpeakerIdentification(audioData)
+                    // 話者名とIDの決定
+                    val (speakerId, speakerName) = when {
+                        // 登録済み話者が存在しない場合
+                        registeredSpeakers.isEmpty() -> {
+                            Pair("unknown", "Unknown Speaker")
                         }
+                        // 登録済み話者が存在する場合、最も類似度が高い話者を選択
+                        else -> {
+                            val audioData = audioBuffer.toShortArray()
+                            val embedding = speakerIdentifier?.extractEmbedding(audioData)
+
+                            if (embedding != null) {
+                                var bestScore = -1f
+                                var bestSpeaker: SpeakerStorage.SpeakerMetadata? = null
+
+                                registeredSpeakers.forEach { speaker ->
+                                    speakerIdentifier?.let { identifier ->
+                                        identifier.identifySpeaker(embedding)?.let { (id, score) ->
+                                            if (score > bestScore) {
+                                                bestScore = score
+                                                bestSpeaker = speaker
+                                            }
+                                        }
+                                    }
+                                }
+
+                                bestSpeaker?.let {
+                                    Pair(it.id, it.name)
+                                } ?: Pair("unknown", "Unknown Speaker")
+                            } else {
+                                // デフォルトとして最初の登録話者を使用
+                                val defaultSpeaker = registeredSpeakers.first()
+                                Pair(defaultSpeaker.id, defaultSpeaker.name)
+                            }
+                        }
+                    }
+
+                    // 会話エントリーを追加
+                    conversationStorage.addEntry(
+                        ConversationHistoryStorage.ConversationEntry(
+                            speakerId = speakerId,
+                            speakerName = speakerName,
+                            message = text,
+                            timestamp = System.currentTimeMillis(),
+                            confidence = currentSpeakerConfidence ?: 0f
+                        )
+                    )
+                    // 最新の会話履歴を更新
+                    updateRecentConversations()
+
+                    // 話者識別用のバッファをクリア
+                    if (audioBuffer.size >= speakerBufferSize) {
+                        audioBuffer.clear()
                     }
                 }
             } catch (e: Exception) {
