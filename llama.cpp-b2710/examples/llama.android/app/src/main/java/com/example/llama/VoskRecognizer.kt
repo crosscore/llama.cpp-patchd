@@ -3,8 +3,10 @@ package com.example.llama
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.vosk.Model
@@ -17,6 +19,8 @@ import java.util.Date
 
 class VoskRecognizer private constructor(private val context: Context) {
     private val tag = "VoskRecognizer"
+
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     private var model: Model? = null
     private var speechService: SpeechService? = null
@@ -50,13 +54,11 @@ class VoskRecognizer private constructor(private val context: Context) {
                 if (text.isNotBlank()) {
                     onResult?.invoke(hypothesis)
 
-                    // バッファサイズのチェックを追加
                     if (audioBuffer.size >= speakerBufferSize) {
                         val audioData = audioBuffer.toShortArray()
-                        audioBuffer.clear() // バッファをクリア
+                        audioBuffer.clear()
 
-                        // 別のコルーチンで話者識別を実行
-                        GlobalScope.launch(Dispatchers.IO) {
+                        coroutineScope.launch(Dispatchers.IO) {
                             performSpeakerIdentification(audioData)
                         }
                     }
@@ -287,6 +289,7 @@ class VoskRecognizer private constructor(private val context: Context) {
      */
     fun release() {
         try {
+            coroutineScope.cancel()
             speechService?.shutdown()
             speechService = null
             recognizer?.close()
