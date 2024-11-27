@@ -49,6 +49,56 @@ class ConversationHistoryStorage private constructor(context: Context) {
         }
     }
 
+    data class SessionInfo(
+        val sessionId: String,
+        val timestamp: Long,
+        val entries: List<ConversationEntry>
+    )
+
+    fun getAllSessions(): List<SessionInfo> {
+        try {
+            val sessionDirs = conversationDir.listFiles { file -> file.isDirectory }
+                ?.sortedByDescending { it.name } ?: return emptyList()
+
+            return sessionDirs.mapNotNull { sessionDir ->
+                val conversationFile = File(sessionDir, "conversation.json")
+                if (conversationFile.exists() && conversationFile.length() > 0) {
+                    try {
+                        val fileContent = conversationFile.readText()
+                        val jsonArray = JSONArray(fileContent)
+                        val entries = List(jsonArray.length()) { i ->
+                            val json = jsonArray.getJSONObject(i)
+                            ConversationEntry(
+                                speakerId = json.getString("speakerId"),
+                                speakerName = json.getString("speakerName"),
+                                message = json.getString("message"),
+                                timestamp = json.getLong("timestamp"),
+                                confidence = json.getDouble("confidence").toFloat()
+                            )
+                        }
+
+                        // セッションIDからタイムスタンプを抽出
+                        val timestamp = sessionDir.name.substringBefore("_").toLongOrNull()?.let {
+                            SimpleDateFormat("yyyyMMdd", Locale.getDefault()).parse(it.toString())?.time
+                        } ?: System.currentTimeMillis()
+
+                        SessionInfo(
+                            sessionId = sessionDir.name,
+                            timestamp = timestamp,
+                            entries = entries
+                        )
+                    } catch (e: Exception) {
+                        Log.e(tag, "Error reading session ${sessionDir.name}", e)
+                        null
+                    }
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Failed to get sessions", e)
+            return emptyList()
+        }
+    }
+
     fun startNewSession() {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         currentSessionDir = File(conversationDir, timestamp).also { dir ->

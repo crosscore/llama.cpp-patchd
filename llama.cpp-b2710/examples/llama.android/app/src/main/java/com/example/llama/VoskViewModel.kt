@@ -75,6 +75,20 @@ class VoskViewModel(
     var recentConversations by mutableStateOf<List<ConversationHistoryStorage.ConversationEntry>>(emptyList())
         private set
 
+    var allSessions by mutableStateOf<List<ConversationHistoryStorage.SessionInfo>>(emptyList())
+        private set
+
+    fun loadAllSessions() {
+        viewModelScope.launch {
+            try {
+                allSessions = conversationStorage.getAllSessions()
+                Log.d(tag, "Loaded ${allSessions.size} sessions")
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to load sessions", e)
+            }
+        }
+    }
+
     // 会話履歴の更新を明示的に行うメソッドを追加
     fun loadConversationHistory() {
         viewModelScope.launch {

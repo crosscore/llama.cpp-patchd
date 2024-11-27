@@ -13,12 +13,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.Alignment
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
@@ -581,7 +583,12 @@ fun ConversationHistoryDialog(
     viewModel: VoskViewModel,
     clipboard: ClipboardManager
 ) {
+    var selectedSessionId by remember { mutableStateOf<String?>(null) }
     val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+
+    LaunchedEffect(Unit) {
+        viewModel.loadAllSessions()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -592,42 +599,98 @@ fun ConversationHistoryDialog(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 400.dp)
-                ) {
-                    items(viewModel.recentConversations) { entry ->
-                        val formattedTimestamp = dateFormat.format(Date(entry.timestamp))
-                        Text(
-                            text = "${entry.speakerName}: ${entry.message} ($formattedTimestamp)",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.padding(vertical = 4.dp)
-                        )
-                    }
-                }
+                if (selectedSessionId == null) {
+                    // セッション一覧表示
+                    Text(
+                        text = "セッション一覧",
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
 
-                if (viewModel.recentConversations.isNotEmpty()) {
-                    OutlinedButton(
-                        onClick = {
-                            val text = viewModel.recentConversations.joinToString("\n") { entry ->
-                                "${entry.speakerName}: ${entry.message} (${dateFormat.format(Date(entry.timestamp))})"
-                            }
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Conversation History", text))
-                        },
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp)
+                            .heightIn(max = 400.dp)
                     ) {
-                        Text("会話履歴をコピー")
+                        items(viewModel.allSessions) { session ->
+                            val sessionTime = dateFormat.format(Date(session.timestamp))
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable { selectedSessionId = session.sessionId }
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .padding(8.dp)
+                                        .fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "セッション: $sessionTime",
+                                        style = MaterialTheme.typography.titleSmall
+                                    )
+                                    Text(
+                                        text = "会話数: ${session.entries.size}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                }
+                            }
+                        }
                     }
                 } else {
-                    Text(
-                        text = "会話履歴がありません",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(8.dp)
-                    )
+                    // 選択されたセッションの会話履歴表示
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { selectedSessionId = null }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "戻る")
+                        }
+                        Text(
+                            text = "セッション詳細",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val session = viewModel.allSessions.find { it.sessionId == selectedSessionId }
+                    session?.let { currentSession ->
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp)
+                        ) {
+                            items(currentSession.entries) { entry ->
+                                val messageTime = dateFormat.format(Date(entry.timestamp))
+                                Text(
+                                    text = "${entry.speakerName}: ${entry.message}\n$messageTime",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        // コピーボタン
+                        if (currentSession.entries.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = {
+                                    val text = currentSession.entries.joinToString("\n") { entry ->
+                                        "${entry.speakerName}: ${entry.message} (${dateFormat.format(Date(entry.timestamp))})"
+                                    }
+                                    clipboard.setPrimaryClip(
+                                        ClipData.newPlainText("Conversation History", text)
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                            ) {
+                                Text("このセッションをコピー")
+                            }
+                        }
+                    }
                 }
             }
         },
