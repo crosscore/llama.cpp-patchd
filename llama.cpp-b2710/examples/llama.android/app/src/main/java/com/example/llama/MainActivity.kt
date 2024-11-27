@@ -456,7 +456,12 @@ fun MainCompose(
             ) {
                 Text(if (viewModel.isHistoryEnabled) "History ON" else "History OFF")
             }
-            Button(onClick = { showConversationHistory = true }) { Text("会話履歴") }
+            Button(onClick = {
+                viewModel.voskViewModel?.prepareConversationHistory()  // 履歴を準備
+                showConversationHistory = true
+            }) {
+                Text("会話履歴")
+            }
         }
 
         // 音声入力ボタン行
@@ -484,7 +489,7 @@ fun MainCompose(
             Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
         }
 
-        // ダイアログ
+        // モデル
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
@@ -496,11 +501,13 @@ fun MainCompose(
 
         // 会話履歴
         if (showConversationHistory) {
-            ConversationHistoryDialog(
-                onDismiss = { showConversationHistory = false },
-                viewModel = viewModel.voskViewModel ?: return@MainCompose,
-                clipboard = clipboard
-            )
+            viewModel.voskViewModel?.let { voskViewModel ->
+                ConversationHistoryDialog(
+                    onDismiss = { showConversationHistory = false },
+                    viewModel = voskViewModel,
+                    clipboard = clipboard
+                )
+            }
         }
 
         if (viewModel.showSystemPromptDialog) {

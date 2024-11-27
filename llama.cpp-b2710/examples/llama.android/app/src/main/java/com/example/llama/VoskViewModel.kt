@@ -75,10 +75,34 @@ class VoskViewModel(
     var recentConversations by mutableStateOf<List<ConversationHistoryStorage.ConversationEntry>>(emptyList())
         private set
 
+    // 会話履歴の更新を明示的に行うメソッドを追加
+    fun loadConversationHistory() {
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Loading conversation history...")
+                val entries = conversationStorage.getRecentEntries(MAX_CONVERSATION_HISTORY)
+                Log.d(tag, "Loaded ${entries.size} entries from storage")
+                recentConversations = entries
+                Log.d(tag, "Current conversations: ${recentConversations.size}")
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to load conversation history", e)
+            }
+        }
+    }
+
+    // 会話履歴ダイアログを開く前に呼び出すメソッド
+    fun prepareConversationHistory() {
+        Log.d(tag, "Preparing conversation history")
+        if (recentConversations.isEmpty()) {
+            loadConversationHistory()
+        }
+    }
+
+    // 初期化時に会話履歴を読み込む
     init {
         initializeModel()
         conversationStorage.startNewSession()
-        updateRecentConversations()
+        loadConversationHistory()  // 明示的に履歴を読み込む
     }
 
     // 会話履歴の取得件数を定数として定義
@@ -94,8 +118,15 @@ class VoskViewModel(
 
     // 会話履歴の更新
     private fun updateRecentConversations() {
-        recentConversations = conversationStorage.getRecentEntries(MAX_CONVERSATION_HISTORY)
-            .sortedBy { it.timestamp } // タイムスタンプで昇順ソート
+        viewModelScope.launch {
+            try {
+                val entries = conversationStorage.getRecentEntries(MAX_CONVERSATION_HISTORY)
+                Log.d(tag, "Updating conversations, loaded ${entries.size} entries")
+                recentConversations = entries
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to update recent conversations", e)
+            }
+        }
     }
 
     // 会話履歴のフォーマット済みテキストを取得
