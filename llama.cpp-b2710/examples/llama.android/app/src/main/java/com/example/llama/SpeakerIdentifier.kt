@@ -3,6 +3,7 @@ package com.example.llama
 import android.app.Application
 import android.content.Context
 import android.util.Log
+import org.json.JSONArray
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.SpeakerModel
@@ -17,27 +18,6 @@ class SpeakerIdentifier private constructor(application: Application) {
     private var model: Model? = null
 
     private val contextRef = WeakReference(application)
-
-    data class SpeakerProfile(
-        val id: String,
-        val name: String,
-        val embedding: FloatArray
-    ) {
-        override fun equals(other: Any?): Boolean {
-            if (this === other) return true
-            if (javaClass != other?.javaClass) return false
-            other as SpeakerProfile
-            return id == other.id && embedding.contentEquals(other.embedding)
-        }
-
-        override fun hashCode(): Int {
-            var result = id.hashCode()
-            result = 31 * result + embedding.contentHashCode()
-            return result
-        }
-    }
-
-    private val speakerProfiles = mutableMapOf<String, SpeakerProfile>()
 
     companion object {
         private const val SAMPLE_RATE = 16000f
@@ -139,33 +119,53 @@ class SpeakerIdentifier private constructor(application: Application) {
     }
 
     @Synchronized
-    fun registerSpeaker(id: String, name: String, embedding: FloatArray) {
-        val profile = SpeakerProfile(id, name, embedding)
-        speakerProfiles[id] = profile
-        Log.i(tag, "Registered new speaker profile: $id ($name)")
-    }
-
-    @Synchronized
     fun identifySpeaker(embedding: FloatArray): Pair<String, Float>? {
-        if (speakerProfiles.isEmpty()) {
-            Log.w(tag, "No speaker profiles registered")
+        try {
+            val context = contextRef.get() ?: return null
+            val storage = SpeakerStorage.getInstance(context)
+
+            // 全ての登録済み話者のメタデータを取得
+            val allSpeakers = storage.getAllSpeakerMetadata()
+            if (allSpeakers.isEmpty()) {
+                Log.w(tag, "No registered speakers found in storage")
+                return null
+            }
+
+            var bestMatch: Triple<String, String, Float>? = null
+
+            // 各話者のembedding.jsonを読み込んで類似度を計算
+            allSpeakers.forEach { metadata ->
+                try {
+                    val embeddingFile = File(metadata.embeddingPath)
+                    if (embeddingFile.exists()) {
+                        val jsonArray = JSONArray(embeddingFile.readText())
+                        val storedEmbedding = FloatArray(jsonArray.length()) { i ->
+                            jsonArray.getDouble(i).toFloat()
+                        }
+
+                        val similarity = cosineSimilarity(embedding, storedEmbedding)
+                        Log.d(tag, "Similarity with ${metadata.name} (${metadata.id}): $similarity")
+
+                        if (bestMatch == null || similarity > bestMatch!!.third) {
+                            bestMatch = Triple(metadata.id, metadata.name, similarity)
+                            Log.d(tag, "New best match: ${metadata.name} with score $similarity")
+                        }
+                    } else {
+                        Log.w(tag, "Embedding file not found: ${metadata.embeddingPath}")
+                    }
+                } catch (e: Exception) {
+                    Log.e(tag, "Error processing embedding for speaker ${metadata.id}", e)
+                }
+            }
+
+            return bestMatch?.let { (id, name, score) ->
+                Log.i(tag, "Selected speaker: $name (ID: $id) with score: $score")
+                Pair(id, score)
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error in speaker identification", e)
             return null
         }
-
-        var bestMatch: Pair<String, Float>? = null
-
-        speakerProfiles.forEach { (id, profile) ->
-            val similarity = cosineSimilarity(embedding, profile.embedding)
-            if (bestMatch == null || similarity > bestMatch!!.second) {
-                bestMatch = Pair(id, similarity)
-            }
-        }
-
-        bestMatch?.let { (id, score) ->
-            Log.i(tag, "Identified speaker: $id (score: $score)")
-        }
-
-        return bestMatch
     }
 
     private fun cosineSimilarity(a: FloatArray, b: FloatArray): Float {
@@ -202,7 +202,6 @@ class SpeakerIdentifier private constructor(application: Application) {
     @Synchronized
     fun release() {
         releaseResources()
-        speakerProfiles.clear()
         contextRef.clear()
         Log.i(tag, "Speaker identifier resources released")
     }

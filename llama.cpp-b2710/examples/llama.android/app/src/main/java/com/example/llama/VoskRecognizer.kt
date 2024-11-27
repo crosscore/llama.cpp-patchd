@@ -53,6 +53,9 @@ class VoskRecognizer private constructor(private val context: Context) {
     // 現在の話者識別の信頼度
     private var currentSpeakerConfidence: Float? = null
 
+    // 現在の話者ID
+    private var currentSpeakerId: String? = null
+
     // 会話履歴の更新メソッド
     private fun updateRecentConversations() {
         // conversationStorageから最新のエントリを取得
@@ -71,80 +74,11 @@ class VoskRecognizer private constructor(private val context: Context) {
         }
 
         override fun onResult(hypothesis: String) {
-            try {
-                val json = JSONObject(hypothesis)
-                val text = json.optString("text")
-
-                if (text.isNotBlank()) {
-                    onResult?.invoke(hypothesis)
-
-                    // 登録済みの話者を取得
-                    val registeredSpeakers = speakerStorage.getAllSpeakerMetadata()
-
-                    // 話者名とIDの決定
-                    val (speakerId, speakerName) = when {
-                        // 登録済み話者が存在しない場合
-                        registeredSpeakers.isEmpty() -> {
-                            Pair("unknown", "Unknown Speaker")
-                        }
-                        // 登録済み話者が存在する場合、最も類似度が高い話者を選択
-                        else -> {
-                            val audioData = audioBuffer.toShortArray()
-                            val embedding = speakerIdentifier?.extractEmbedding(audioData)
-
-                            if (embedding != null) {
-                                var bestScore = -1f
-                                var bestSpeaker: SpeakerStorage.SpeakerMetadata? = null
-
-                                registeredSpeakers.forEach { speaker ->
-                                    speakerIdentifier?.let { identifier ->
-                                        identifier.identifySpeaker(embedding)?.let { (_, score) ->
-                                            if (score > bestScore) {
-                                                bestScore = score
-                                                bestSpeaker = speaker
-                                            }
-                                        }
-                                    }
-                                }
-
-                                bestSpeaker?.let {
-                                    Pair(it.id, it.name)
-                                } ?: Pair("unknown", "Unknown Speaker")
-                            } else {
-                                // デフォルトとして最初の登録話者を使用
-                                val defaultSpeaker = registeredSpeakers.first()
-                                Pair(defaultSpeaker.id, defaultSpeaker.name)
-                            }
-                        }
-                    }
-
-                    // 会話エントリーを追加
-                    conversationStorage.addEntry(
-                        ConversationHistoryStorage.ConversationEntry(
-                            speakerId = speakerId,
-                            speakerName = speakerName,
-                            message = text,
-                            timestamp = System.currentTimeMillis(),
-                            confidence = currentSpeakerConfidence ?: 0f
-                        )
-                    )
-                    // 最新の会話履歴を更新
-                    updateRecentConversations()
-
-                    // 話者識別用のバッファをクリア
-                    if (audioBuffer.size >= speakerBufferSize) {
-                        audioBuffer.clear()
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "Error processing recognition result", e)
-                onError?.invoke(e)
-            }
+            onResultHandler(hypothesis)
         }
 
         override fun onFinalResult(hypothesis: String) {
-            // 最終結果（onResultと同様の処理）
-            onResult?.invoke(hypothesis)
+            onResultHandler(hypothesis)
         }
 
         override fun onError(exception: Exception) {
@@ -272,36 +206,75 @@ class VoskRecognizer private constructor(private val context: Context) {
      */
     private fun performSpeakerIdentification(audioData: ShortArray) {
         try {
-            // 音声データの検証
-            if (audioData.isEmpty()) {
-                Log.w(tag, "Empty audio data, skipping speaker identification")
+            if (audioData.isEmpty() || audioData.size < 16000) {
+                Log.w(tag, "Insufficient audio data for speaker identification")
                 return
             }
 
-            // 音声データの長さチェック
-            if (audioData.size < 16000) { // 最低1秒分のデータ
-                Log.w(tag, "Audio data too short for speaker identification")
-                return
-            }
-
-            // DC オフセットの除去とノーマライズ
             val processedAudio = preprocessAudioData(audioData)
 
             speakerIdentifier?.let { identifier ->
                 val embedding = identifier.extractEmbedding(processedAudio)
                 embedding?.let { emb ->
                     identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
-                        // スコアの閾値チェックを追加
-                        if (score > 0.7f) {  // 70%以上の信頼度
-                            onSpeakerIdentified?.invoke(speakerId, score)
+                        if (score > 0.5f) {
+                            val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
+                                .find { it.id == speakerId }
+
+                            speakerMetadata?.let {
+                                // 話者IDを更新
+                                currentSpeakerId = speakerId
+                                onSpeakerIdentified?.invoke(speakerId, score)
+                                currentSpeakerConfidence = score
+
+                                Log.d(tag, "Speaker identified: ${it.name} (ID: $speakerId) with confidence: $score")
+                            }
                         } else {
                             Log.d(tag, "Speaker identification score too low: $score")
+                            currentSpeakerId = "unknown"
+                            onSpeakerIdentified?.invoke("unknown", 0.0f)
+                            currentSpeakerConfidence = 0.0f
                         }
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "Error in speaker identification", e)
+            onError?.invoke(e)
+        }
+    }
+
+    private fun onResultHandler(hypothesis: String) {
+        try {
+            val json = JSONObject(hypothesis)
+            val text = json.optString("text")
+
+            if (text.isNotBlank()) {
+                onResult?.invoke(hypothesis)
+
+                // 現在識別されている話者情報を取得
+                val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
+                    .find { it.id == currentSpeakerId }
+
+                // 会話エントリーを追加
+                val entry = ConversationHistoryStorage.ConversationEntry(
+                    speakerId = currentSpeakerId ?: "unknown",
+                    speakerName = speakerMetadata?.name ?: "Unknown Speaker",
+                    message = text,
+                    timestamp = System.currentTimeMillis(),
+                    confidence = currentSpeakerConfidence ?: 0f
+                )
+
+                conversationStorage.addEntry(entry)
+                updateRecentConversations()
+
+                // 音声バッファをクリア
+                if (audioBuffer.size >= speakerBufferSize) {
+                    audioBuffer.clear()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error processing recognition result", e)
             onError?.invoke(e)
         }
     }
@@ -345,10 +318,7 @@ class VoskRecognizer private constructor(private val context: Context) {
                 // 特徴ベクトルの抽出
                 val embedding = identifier.extractEmbedding(audioData)
                 embedding?.let { emb ->
-                    // SpeakerIdentifier に登録
-                    identifier.registerSpeaker(id, name, emb)
-
-                    // SpeakerStorage にも保存
+                    // SpeakerStorage にデータを保存
                     val storage = SpeakerStorage.getInstance(context)
 
                     // 録音データを保存
@@ -367,6 +337,7 @@ class VoskRecognizer private constructor(private val context: Context) {
                     )
                     storage.saveSpeakerMetadata(metadata)
 
+                    Log.i(tag, "Successfully registered speaker: $name (ID: $id)")
                     true
                 } ?: false
             } ?: false
