@@ -63,8 +63,23 @@ class VoskViewModel(
         data class Error(val message: String) : RegistrationState()
     }
 
+    // 会話履歴の管理
+    private val conversationStorage by lazy {
+        ConversationHistoryStorage.getInstance(appContext)
+    }
+
+    // 最新の会話履歴
+    var recentConversations by mutableStateOf<List<ConversationHistoryStorage.ConversationEntry>>(emptyList())
+        private set
+
     init {
         initializeModel()
+        conversationStorage.startNewSession()
+        updateRecentConversations()
+    }
+
+    private fun updateRecentConversations() {
+        recentConversations = conversationStorage.getRecentEntries()
     }
 
     fun getApplication(): Application {
@@ -101,6 +116,13 @@ class VoskViewModel(
         }
     }
 
+    // 会話履歴をコピー用のテキスト形式に変換
+    fun getFormattedConversationHistory(): String {
+        return recentConversations.joinToString("\n") { entry ->
+            "${entry.speakerName}：${entry.message}"
+        }
+    }
+
     private fun setupRecognitionCallbacks() {
         voskRecognizer.onPartialResult = { hypothesis ->
             try {
@@ -118,6 +140,27 @@ class VoskViewModel(
                 json.optString("text").let { text ->
                     if (text.isNotBlank()) {
                         currentTranscript = text
+                        // 話者認識の結果を待ってから会話履歴に追加する
+                        currentSpeakerId?.let { speakerId ->
+                            // 話者名を取得
+                            val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
+                                .find { it.id == speakerId }
+
+                            if (speakerMetadata != null) {
+                                // 会話エントリーを追加
+                                conversationStorage.addEntry(
+                                    ConversationHistoryStorage.ConversationEntry(
+                                        speakerId = speakerId,
+                                        speakerName = speakerMetadata.name,
+                                        message = text,
+                                        timestamp = System.currentTimeMillis(),
+                                        confidence = currentSpeakerConfidence ?: 0f
+                                    )
+                                )
+                                // 最新の会話履歴を更新
+                                updateRecentConversations()
+                            }
+                        }
                         onRecognitionResult(text)
                     }
                 }
@@ -132,7 +175,6 @@ class VoskViewModel(
             stopRecording()
         }
 
-        // 話者識別のコールバック
         voskRecognizer.onSpeakerIdentified = { speakerId, confidence ->
             currentSpeakerId = speakerId
             currentSpeakerConfidence = confidence

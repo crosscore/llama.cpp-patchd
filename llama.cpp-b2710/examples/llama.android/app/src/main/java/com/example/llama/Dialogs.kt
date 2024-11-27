@@ -3,6 +3,8 @@ package com.example.llama
 
 import android.annotation.SuppressLint
 import android.app.DownloadManager
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.util.Log
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import kotlin.text.*
 
@@ -567,6 +570,78 @@ fun SpeakerRegistrationDialog(
                 ) {
                     Text("Cancel")
                 }
+            }
+        }
+    )
+}
+
+@Composable
+fun ConversationHistoryDialog(
+    onDismiss: () -> Unit,
+    viewModel: VoskViewModel,
+    clipboard: ClipboardManager
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("会話履歴") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 400.dp)
+                ) {
+                    items(viewModel.recentConversations) { entry ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(8.dp)
+                                    .fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = "${entry.speakerName}：${entry.message}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                )
+                                Text(
+                                    text = SimpleDateFormat(
+                                        "HH:mm:ss",
+                                        Locale.getDefault()
+                                    ).format(Date(entry.timestamp)),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // コピーボタン
+                OutlinedButton(
+                    onClick = {
+                        val text = viewModel.getFormattedConversationHistory()
+                        clipboard.setPrimaryClip(
+                            ClipData.newPlainText("Conversation History", text)
+                        )
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                ) {
+                    Text("会話履歴をコピー")
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("閉じる")
             }
         }
     )

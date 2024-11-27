@@ -74,21 +74,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkSpeakerData() {
-        val baseDir = getExternalFilesDir(null)
-        val speakerDataDir = File(baseDir, "speaker_data")
-
-        Log.d("SpeakerData", "Base directory: ${baseDir?.absolutePath}")
-        Log.d("SpeakerData", "Speaker data exists: ${speakerDataDir.exists()}")
-
-        if (speakerDataDir.exists()) {
-            Log.d("SpeakerData", "Speaker data contents:")
-            speakerDataDir.walk().forEach { file ->
-                Log.d("SpeakerData", "- ${baseDir?.let { file.relativeTo(it).path }} (${file.length()} bytes)")
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -177,6 +162,21 @@ class MainActivity : ComponentActivity() {
 
         viewModel.onModelOperationCompleted = {
             loadModels()
+        }
+    }
+
+    private fun checkSpeakerData() {
+        val baseDir = getExternalFilesDir(null)
+        val speakerDataDir = File(baseDir, "speaker_data")
+
+        Log.d("SpeakerData", "Base directory: ${baseDir?.absolutePath}")
+        Log.d("SpeakerData", "Speaker data exists: ${speakerDataDir.exists()}")
+
+        if (speakerDataDir.exists()) {
+            Log.d("SpeakerData", "Speaker data contents:")
+            speakerDataDir.walk().forEach { file ->
+                Log.d("SpeakerData", "- ${baseDir?.let { file.relativeTo(it).path }} (${file.length()} bytes)")
+            }
         }
     }
 
@@ -288,14 +288,17 @@ fun MainCompose(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // 既存の状態
+    // 録音の状態変数
     val isRecording = viewModel.isRecording
     val currentVoiceTranscript = viewModel.currentVoiceTranscript
     val voiceError = viewModel.voiceRecognitionError
 
-    // 話者管理用の状態
+    // 話者管理用の状態変数
     var showSpeakerManagementDialog by remember { mutableStateOf(false) }
     var showSpeakerRegistrationDialog by remember { mutableStateOf(false) }
+
+    // 会話履歴の状態変数
+    var showConversationHistory by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -324,7 +327,7 @@ fun MainCompose(
             }
         }
 
-        // チャットメッセージ表示エリア（既存）
+        // チャットメッセージ表示エリア
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -338,7 +341,7 @@ fun MainCompose(
                 items(viewModel.messages) { (userMessage, assistantResponse) ->
                     Text(
                         text = "User: $userMessage",
-                        color = Color(0xFFFFFFFF),
+                        color = Color(0xFFF0F0F0),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Text(
@@ -351,7 +354,7 @@ fun MainCompose(
             }
         }
 
-        // メッセージ入力欄と音声認識中の表示（既存）
+        // メッセージ入力欄と音声認識中の表示
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
@@ -373,7 +376,7 @@ fun MainCompose(
             }
         }
 
-        // パラメータコントロール（既存）
+        // パラメータコントロール
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -406,7 +409,7 @@ fun MainCompose(
             )
         }
 
-        // アクションボタン（既存）
+        // アクションボタン
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -453,6 +456,7 @@ fun MainCompose(
             ) {
                 Text(if (viewModel.isHistoryEnabled) "History ON" else "History OFF")
             }
+            Button(onClick = { showConversationHistory = true }) { Text("会話履歴") }
         }
 
         // 音声入力ボタン行
@@ -480,13 +484,22 @@ fun MainCompose(
             Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
         }
 
-        // 既存のダイアログ
+        // ダイアログ
         if (showModelDialog) {
             ModelDialog(
                 onDismiss = { onShowModelDialog(false) },
                 models = models,
                 viewModel = viewModel,
                 dm = dm
+            )
+        }
+
+        // 会話履歴
+        if (showConversationHistory) {
+            ConversationHistoryDialog(
+                onDismiss = { showConversationHistory = false },
+                viewModel = viewModel.voskViewModel ?: return@MainCompose,
+                clipboard = clipboard
             )
         }
 
@@ -498,7 +511,7 @@ fun MainCompose(
             )
         }
 
-        // 話者管理関連のダイアログ
+        // 話者管理
         if (showSpeakerManagementDialog) {
             viewModel.voskViewModel?.let { voskViewModel ->
                 SpeakerManagementDialog(
@@ -526,7 +539,7 @@ fun MainCompose(
             }
         }
 
-        // エラーダイアログ（既存）
+        // エラーダイアログ
         voiceError?.let { error ->
             AlertDialog(
                 onDismissRequest = { viewModel.clearVoiceError() },
