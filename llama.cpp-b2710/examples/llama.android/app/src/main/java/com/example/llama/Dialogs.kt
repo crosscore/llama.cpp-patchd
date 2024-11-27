@@ -581,6 +581,8 @@ fun ConversationHistoryDialog(
     viewModel: VoskViewModel,
     clipboard: ClipboardManager
 ) {
+    val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("会話履歴") },
@@ -590,52 +592,28 @@ fun ConversationHistoryDialog(
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
-                // 会話履歴の表示
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 400.dp)
                 ) {
                     items(viewModel.recentConversations) { entry ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .padding(12.dp)
-                                    .fillMaxWidth()
-                            ) {
-                                Text(
-                                    text = "${entry.speakerName}：${entry.message} (${
-                                        SimpleDateFormat(
-                                            "yyyy-MM-dd HH:mm:ss",
-                                            Locale.getDefault()
-                                        ).format(Date(entry.timestamp))
-                                    })",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                )
-                            }
-                        }
+                        val formattedTimestamp = dateFormat.format(Date(entry.timestamp))
+                        Text(
+                            text = "${entry.speakerName}: ${entry.message} ($formattedTimestamp)",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
                     }
                 }
 
-                // コピーボタン
                 if (viewModel.recentConversations.isNotEmpty()) {
                     OutlinedButton(
                         onClick = {
                             val text = viewModel.recentConversations.joinToString("\n") { entry ->
-                                "${entry.speakerName}：${entry.message} (${
-                                    SimpleDateFormat(
-                                        "yyyy-MM-dd HH:mm:ss",
-                                        Locale.getDefault()
-                                    ).format(Date(entry.timestamp))
-                                })"
+                                "${entry.speakerName}: ${entry.message} (${dateFormat.format(Date(entry.timestamp))})"
                             }
-                            clipboard.setPrimaryClip(
-                                ClipData.newPlainText("Conversation History", text)
-                            )
+                            clipboard.setPrimaryClip(ClipData.newPlainText("Conversation History", text))
                         },
                         modifier = Modifier
                             .fillMaxWidth()
@@ -644,7 +622,6 @@ fun ConversationHistoryDialog(
                         Text("会話履歴をコピー")
                     }
                 } else {
-                    // 履歴が空の場合
                     Text(
                         text = "会話履歴がありません",
                         style = MaterialTheme.typography.bodyMedium,
