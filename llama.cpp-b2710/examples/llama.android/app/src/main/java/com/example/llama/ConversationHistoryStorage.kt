@@ -98,13 +98,25 @@ class ConversationHistoryStorage private constructor(context: Context) {
 
     fun getRecentEntries(limit: Int = 5): List<ConversationEntry> {
         return try {
-            currentSessionFile?.let { file ->
-                if (!file.exists() || file.length().toInt() == 0) return emptyList()
+            Log.d(tag, "Current session path: ${getCurrentSessionPath()}")
 
-                val jsonArray = JSONArray(file.readText())
+            currentSessionFile?.let { file ->
+                if (!file.exists()) {
+                    Log.d(tag, "Session file does not exist")
+                    return emptyList()
+                }
+
+                if (file.length() == 0L) {
+                    Log.d(tag, "Session file is empty")
+                    return emptyList()
+                }
+
+                val fileContent = file.readText()
+                Log.d(tag, "File content: $fileContent")
+
+                val jsonArray = JSONArray(fileContent)
                 val entries = mutableListOf<ConversationEntry>()
 
-                // 最新のエントリーから指定された数だけ取得
                 for (i in (jsonArray.length() - 1) downTo maxOf(0, jsonArray.length() - limit)) {
                     val json = jsonArray.getJSONObject(i)
                     entries.add(
@@ -117,15 +129,20 @@ class ConversationHistoryStorage private constructor(context: Context) {
                         )
                     )
                 }
+
+                Log.d(tag, "Loaded ${entries.size} entries")
                 entries.reversed()
-            } ?: emptyList()
+            } ?: run {
+                Log.d(tag, "Current session file is null")
+                emptyList()
+            }
         } catch (e: Exception) {
             Log.e(tag, "Failed to get recent entries", e)
             emptyList()
         }
     }
 
-    fun getCurrentSessionPath(): String? {
+    private fun getCurrentSessionPath(): String? {
         return currentSessionFile?.absolutePath
     }
 }
