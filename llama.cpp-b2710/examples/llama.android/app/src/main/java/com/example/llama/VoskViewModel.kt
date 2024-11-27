@@ -15,8 +15,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.io.File
-import java.util.Date
 
 class VoskViewModel(
     application: Application,

@@ -138,7 +138,6 @@ class SpeakerStorage private constructor(context: Context) {
                 JSONArray()
             }
 
-            // 既存のメタデータを更新または新規追加
             var updated = false
             for (i in 0 until existingMetadata.length()) {
                 val item = existingMetadata.getJSONObject(i)
@@ -153,7 +152,11 @@ class SpeakerStorage private constructor(context: Context) {
                 existingMetadata.put(createMetadataJson(metadata))
             }
 
-            metadataFile.writeText(existingMetadata.toString(2))
+            // インデントと行末の改行を調整して保存
+            val jsonString = existingMetadata.toString(2)
+                .replace("\\/", "/") // エスケープされたスラッシュを通常のスラッシュに変換
+            metadataFile.writeText(jsonString)
+
             Log.i(tag, "Saved metadata for speaker ${metadata.id}")
         } catch (e: Exception) {
             Log.e(tag, "Failed to save metadata for speaker ${metadata.id}", e)
@@ -234,8 +237,8 @@ class SpeakerStorage private constructor(context: Context) {
             put("id", metadata.id)
             put("name", metadata.name)
             put("registrationDate", metadata.registrationDate.time)
-            put("samplePath", metadata.samplePath)
-            put("embeddingPath", metadata.embeddingPath)
+            put("samplePath", metadata.samplePath.replace("\\", "/"))
+            put("embeddingPath", metadata.embeddingPath.replace("\\", "/"))
         }
     }
 
