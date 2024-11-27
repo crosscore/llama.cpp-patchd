@@ -584,10 +584,41 @@ fun ConversationHistoryDialog(
     clipboard: ClipboardManager
 ) {
     var selectedSessionId by remember { mutableStateOf<String?>(null) }
+    var showDeleteConfirmation by remember { mutableStateOf<String?>(null) }
     val dateFormat = SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale.getDefault())
 
     LaunchedEffect(Unit) {
         viewModel.loadAllSessions()
+    }
+
+    // 削除確認ダイアログ
+    showDeleteConfirmation?.let { sessionId ->
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = null },
+            title = { Text("セッションの削除") },
+            text = { Text("このセッションを削除してもよろしいですか？") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteSession(sessionId)
+                        showDeleteConfirmation = null
+                        if (selectedSessionId == sessionId) {
+                            selectedSessionId = null
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("削除")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDeleteConfirmation = null }) {
+                    Text("キャンセル")
+                }
+            }
+        )
     }
 
     AlertDialog(
@@ -614,25 +645,50 @@ fun ConversationHistoryDialog(
                     ) {
                         items(viewModel.allSessions) { session ->
                             val sessionTime = dateFormat.format(Date(session.timestamp))
+                            val isCurrentSession = viewModel.isCurrentSession(session.sessionId)
+
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
                                     .clickable { selectedSessionId = session.sessionId }
                             ) {
-                                Column(
+                                Row(
                                     modifier = Modifier
                                         .padding(8.dp)
-                                        .fillMaxWidth()
+                                        .fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = "セッション: $sessionTime",
-                                        style = MaterialTheme.typography.titleSmall
-                                    )
-                                    Text(
-                                        text = "会話数: ${session.entries.size}",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = "セッション: $sessionTime",
+                                            style = MaterialTheme.typography.titleSmall
+                                        )
+                                        Text(
+                                            text = "会話数: ${session.entries.size}",
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        if (isCurrentSession) {
+                                            Text(
+                                                text = "現在のセッション",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                    if (!isCurrentSession) {
+                                        IconButton(
+                                            onClick = { showDeleteConfirmation = session.sessionId }
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "セッションを削除"
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

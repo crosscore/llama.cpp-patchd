@@ -63,7 +63,7 @@ class VoskRecognizer private constructor(private val context: Context) {
     }
 
     // 会話履歴更新時のコールバック
-    var onConversationsUpdated: ((List<ConversationHistoryStorage.ConversationEntry>) -> Unit)? = null
+    private var onConversationsUpdated: ((List<ConversationHistoryStorage.ConversationEntry>) -> Unit)? = null
 
     private val recognitionListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
@@ -98,7 +98,7 @@ class VoskRecognizer private constructor(private val context: Context) {
 
                                 registeredSpeakers.forEach { speaker ->
                                     speakerIdentifier?.let { identifier ->
-                                        identifier.identifySpeaker(embedding)?.let { (id, score) ->
+                                        identifier.identifySpeaker(embedding)?.let { (_, score) ->
                                             if (score > bestScore) {
                                                 bestScore = score
                                                 bestSpeaker = speaker

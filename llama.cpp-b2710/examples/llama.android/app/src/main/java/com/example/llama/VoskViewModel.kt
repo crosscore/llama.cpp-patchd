@@ -15,9 +15,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class VoskViewModel(
     application: Application,
@@ -72,8 +69,7 @@ class VoskViewModel(
     }
 
     // 最新の会話履歴
-    var recentConversations by mutableStateOf<List<ConversationHistoryStorage.ConversationEntry>>(emptyList())
-        private set
+    private var recentConversations by mutableStateOf<List<ConversationHistoryStorage.ConversationEntry>>(emptyList())
 
     var allSessions by mutableStateOf<List<ConversationHistoryStorage.SessionInfo>>(emptyList())
         private set
@@ -90,7 +86,7 @@ class VoskViewModel(
     }
 
     // 会話履歴の更新を明示的に行うメソッドを追加
-    fun loadConversationHistory() {
+    private fun loadConversationHistory() {
         viewModelScope.launch {
             try {
                 Log.d(tag, "Loading conversation history...")
@@ -140,16 +136,6 @@ class VoskViewModel(
             } catch (e: Exception) {
                 Log.e(tag, "Failed to update recent conversations", e)
             }
-        }
-    }
-
-    // 会話履歴のフォーマット済みテキストを取得
-    fun getFormattedConversationHistory(): String {
-        return recentConversations.joinToString("\n") { entry ->
-            "${entry.speakerName}：${entry.message} (${
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-                    .format(Date(entry.timestamp))
-            })"
         }
     }
 
@@ -432,5 +418,36 @@ class VoskViewModel(
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }
+    }
+
+    /**
+     * セッションを削除する
+     * @param sessionId 削除対象のセッションID
+     */
+    fun deleteSession(sessionId: String) {
+        viewModelScope.launch {
+            try {
+                val isDeleted = conversationStorage.deleteSession(sessionId)
+                if (isDeleted) {
+                    // 削除成功後、セッション一覧を更新
+                    loadAllSessions()
+                } else {
+                    // 削除失敗時のエラーメッセージを設定
+                    errorMessage = "セッションの削除に失敗しました"
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Failed to delete session", e)
+                errorMessage = "エラー: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * 現在のセッションかどうかを判定する
+     * @param sessionId 判定対象のセッションID
+     * @return 現在のセッションの場合はtrue
+     */
+    fun isCurrentSession(sessionId: String): Boolean {
+        return conversationStorage.getCurrentSessionId() == sessionId
     }
 }

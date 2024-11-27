@@ -200,4 +200,44 @@ class ConversationHistoryStorage private constructor(context: Context) {
             return emptyList()
         }
     }
+
+    /**
+     * セッションを削除する
+     * @param sessionId 削除対象のセッションID
+     * @return 削除が成功したかどうか
+     */
+    fun deleteSession(sessionId: String): Boolean {
+        return try {
+            // 現在のセッションは削除できないようにする
+            if (currentSessionDir?.name == sessionId) {
+                Log.w(tag, "Cannot delete current session")
+                return false
+            }
+
+            val sessionDir = File(conversationDir, sessionId)
+            if (!sessionDir.exists() || !sessionDir.isDirectory) {
+                Log.w(tag, "Session directory not found: $sessionId")
+                return false
+            }
+
+            val success = sessionDir.deleteRecursively()
+            if (success) {
+                Log.i(tag, "Successfully deleted session: $sessionId")
+            } else {
+                Log.e(tag, "Failed to delete session: $sessionId")
+            }
+            success
+        } catch (e: Exception) {
+            Log.e(tag, "Error deleting session $sessionId", e)
+            false
+        }
+    }
+
+    /**
+     * 現在のセッションIDを取得する
+     * @return 現在のセッションID。セッションが開始されていない場合はnull
+     */
+    fun getCurrentSessionId(): String? {
+        return currentSessionDir?.name
+    }
 }

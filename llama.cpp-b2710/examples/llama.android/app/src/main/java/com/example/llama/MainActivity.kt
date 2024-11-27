@@ -341,7 +341,7 @@ fun MainCompose(
                 items(viewModel.messages) { (userMessage, assistantResponse) ->
                     Text(
                         text = "User: $userMessage",
-                        color = Color(0xFFF0F0F0),
+                        color = Color(0xFFE0E0E0),
                         modifier = Modifier.padding(vertical = 2.dp)
                     )
                     Text(
@@ -456,12 +456,6 @@ fun MainCompose(
             ) {
                 Text(if (viewModel.isHistoryEnabled) "History ON" else "History OFF")
             }
-            Button(onClick = {
-                viewModel.voskViewModel?.prepareConversationHistory()  // 履歴を準備
-                showConversationHistory = true
-            }) {
-                Text("会話履歴")
-            }
         }
 
         // 音声入力ボタン行
@@ -486,7 +480,17 @@ fun MainCompose(
                         MaterialTheme.colorScheme.primary
                 )
             ) { Text(if (isRecording) "Stop" else "Record") }
-            Button(onClick = { showSpeakerManagementDialog = true }) { Text("Speakers") }
+
+            Button(onClick = { showSpeakerManagementDialog = true }) {
+                Text("Speakers")
+            }
+
+            Button(onClick = {
+                viewModel.voskViewModel?.prepareConversationHistory()  // 履歴を準備
+                showConversationHistory = true
+            }) {
+                Text("History")
+            }
         }
 
         // モデル
