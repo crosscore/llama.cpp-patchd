@@ -15,6 +15,9 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class VoskViewModel(
     application: Application,
@@ -78,8 +81,31 @@ class VoskViewModel(
         updateRecentConversations()
     }
 
+    // 会話履歴の取得件数を定数として定義
+    companion object {
+        private const val MAX_CONVERSATION_HISTORY = 20 // 最新20件を保持
+
+        // 録音モードのenum classを追加
+        enum class RecordingMode {
+            Recognition,  // 音声認識用
+            Registration // 話者登録用
+        }
+    }
+
+    // 会話履歴の更新
     private fun updateRecentConversations() {
-        recentConversations = conversationStorage.getRecentEntries()
+        recentConversations = conversationStorage.getRecentEntries(MAX_CONVERSATION_HISTORY)
+            .sortedBy { it.timestamp } // タイムスタンプで昇順ソート
+    }
+
+    // 会話履歴のフォーマット済みテキストを取得
+    fun getFormattedConversationHistory(): String {
+        return recentConversations.joinToString("\n") { entry ->
+            "${entry.speakerName}：${entry.message} (${
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+                    .format(Date(entry.timestamp))
+            })"
+        }
     }
 
     fun getApplication(): Application {
@@ -113,13 +139,6 @@ class VoskViewModel(
                 Log.e(tag, "Error initializing models", e)
                 errorMessage = "Error: ${e.message}"
             }
-        }
-    }
-
-    // 会話履歴をコピー用のテキスト形式に変換
-    fun getFormattedConversationHistory(): String {
-        return recentConversations.joinToString("\n") { entry ->
-            "${entry.speakerName}：${entry.message}"
         }
     }
 
@@ -184,14 +203,6 @@ class VoskViewModel(
 
     // 録音データの一時保存用
     private var temporaryRecording = mutableListOf<Short>()
-
-    // 録音モードを companion object の中で定義
-    companion object {
-        enum class RecordingMode {
-            Recognition,
-            Registration
-        }
-    }
 
     // 話者データのストレージ
     private val speakerStorage = SpeakerStorage.getInstance(application)
