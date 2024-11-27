@@ -3,6 +3,10 @@ package com.example.llama
 import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.Recognizer
 import org.vosk.android.RecognitionListener
@@ -35,18 +39,31 @@ class VoskRecognizer private constructor(private val context: Context) {
 
     private val recognitionListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
-            // 部分的な認識結果
             onPartialResult?.invoke(hypothesis)
         }
 
         override fun onResult(hypothesis: String) {
-            // 最終的な認識結果
-            onResult?.invoke(hypothesis)
+            try {
+                val json = JSONObject(hypothesis)
+                val text = json.optString("text")
 
-            // 話者識別の実行
-            if (audioBuffer.size >= speakerBufferSize) {
-                performSpeakerIdentification(audioBuffer.toShortArray())
-                audioBuffer.clear()
+                if (text.isNotBlank()) {
+                    onResult?.invoke(hypothesis)
+
+                    // バッファサイズのチェックを追加
+                    if (audioBuffer.size >= speakerBufferSize) {
+                        val audioData = audioBuffer.toShortArray()
+                        audioBuffer.clear() // バッファをクリア
+
+                        // 別のコルーチンで話者識別を実行
+                        GlobalScope.launch(Dispatchers.IO) {
+                            performSpeakerIdentification(audioData)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error processing recognition result", e)
+                onError?.invoke(e)
             }
         }
 
@@ -165,13 +182,63 @@ class VoskRecognizer private constructor(private val context: Context) {
      * 話者識別の実行
      */
     private fun performSpeakerIdentification(audioData: ShortArray) {
-        speakerIdentifier?.let { identifier ->
-            val embedding = identifier.extractEmbedding(audioData)
-            embedding?.let { emb ->
-                identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
-                    onSpeakerIdentified?.invoke(speakerId, score)
+        try {
+            // 音声データの検証
+            if (audioData.isEmpty()) {
+                Log.w(tag, "Empty audio data, skipping speaker identification")
+                return
+            }
+
+            // 音声データの長さチェック
+            if (audioData.size < 16000) { // 最低1秒分のデータ
+                Log.w(tag, "Audio data too short for speaker identification")
+                return
+            }
+
+            // DC オフセットの除去とノーマライズ
+            val processedAudio = preprocessAudioData(audioData)
+
+            speakerIdentifier?.let { identifier ->
+                val embedding = identifier.extractEmbedding(processedAudio)
+                embedding?.let { emb ->
+                    identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
+                        // スコアの閾値チェックを追加
+                        if (score > 0.7f) {  // 70%以上の信頼度
+                            onSpeakerIdentified?.invoke(speakerId, score)
+                        } else {
+                            Log.d(tag, "Speaker identification score too low: $score")
+                        }
+                    }
                 }
             }
+        } catch (e: Exception) {
+            Log.e(tag, "Error in speaker identification", e)
+            onError?.invoke(e)
+        }
+    }
+
+    // 音声データの前処理
+    private fun preprocessAudioData(audioData: ShortArray): ShortArray {
+        var sum = 0.0
+        // DC オフセットを計算
+        audioData.forEach { sample ->
+            sum += sample
+        }
+        val dcOffset = (sum / audioData.size).toInt()
+
+        // 最大振幅を見つける
+        var maxAmplitude = 1 // ゼロ除算を防ぐ
+        audioData.forEach { sample ->
+            val amplitude = kotlin.math.abs(sample - dcOffset)
+            if (amplitude > maxAmplitude) {
+                maxAmplitude = amplitude
+            }
+        }
+
+        // DCオフセットを除去し、正規化
+        return ShortArray(audioData.size) { i ->
+            val normalizedSample = ((audioData[i] - dcOffset).toFloat() * 32767 / maxAmplitude).toInt()
+            normalizedSample.toShort()
         }
     }
 
