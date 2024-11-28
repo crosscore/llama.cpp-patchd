@@ -1,4 +1,39 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/cpp/llama-android.cpp
+/**
+ * llama.cppとAndroidアプリケーションのJNI連携実装
+ *
+ * このファイルは以下の主要な機能を提供します：
+ * - モデルのロードと初期化
+ * - コンテキスト管理
+ * - トークン生成処理
+ * - KVキャッシュ制御
+ * - メモリ管理の最適化
+ *
+ * 技術的特徴：
+ * - JNI (Java Native Interface)による相互運用
+ * - UTF-8文字列処理の最適化
+ * - トークン化とバッチ処理
+ * - エラーハンドリングの強化
+ *
+ * リソース管理：
+ * - コンテキストサイズの動的調整
+ * - メモリリークの防止
+ * - バッチ処理の最適化
+ * - トークン追跡の実装
+ *
+ * 安全性考慮：
+ * - バッファオーバーフロー対策
+ * - メモリ解放の確実な実行
+ * - 適切なエラー伝播
+ * - 例外処理の実装
+ *
+ * @note 最大コンテキストサイズは2048トークン
+ * @note トークンの結合処理に特別な注意が必要
+ *
+ * @see Llm.kt
+ * @see MainViewModel.kt
+ */
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "performance-no-int-to-ptr"
 #include <android/log.h>

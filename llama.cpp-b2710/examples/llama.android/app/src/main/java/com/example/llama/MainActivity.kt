@@ -1,4 +1,41 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainActivity.kt
+/**
+ * アプリケーションのメインアクティビティ
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - アプリケーションのエントリーポイント
+ * - UIレイアウトの構築と管理
+ * - パーミッション管理
+ * - モデル管理
+ * - 話者データの初期化
+ *
+ * アーキテクチャ設計：
+ * - MVVM (Model-View-ViewModel)パターンの採用
+ * - Jetpack Composeによる宣言的UI
+ * - コルーチンベースの非同期処理
+ * - 状態管理の一元化
+ *
+ * 主な責務：
+ * - アプリケーション初期化処理
+ * - ストレージアクセスの管理
+ * - パーミッションリクエストの処理
+ * - メモリ管理の最適化
+ * - ダウンロードマネージャーの制御
+ *
+ * セキュリティ考慮：
+ * - 外部ストレージアクセスの適切な制御
+ * - マイクパーミッションの管理
+ * - StrictModeによる開発時の問題検出
+ *
+ * @property viewModel メインのViewModel
+ * @property models 利用可能なモデルリスト
+ * @throws SecurityException パーミッション取得失敗時
+ *
+ * @see MainViewModel
+ * @see VoskViewModel
+ * @see ConversationHistoryStorage
+ */
+
 package com.example.llama
 
 import android.Manifest

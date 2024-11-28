@@ -1,4 +1,34 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Downloadable.kt
+/**
+ * モデルファイルのダウンロードと管理を担当するデータクラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - モデルファイルのダウンロード制御
+ * - ダウンロード進捗の管理
+ * - ファイルの整合性検証
+ * - モデルファイルの状態管理
+ *
+ * 技術的特徴：
+ * - AndroidのDownloadManager APIの活用
+ * - SHA-256によるチェックサム検証
+ * - 非同期ダウンロード処理
+ * - プログレス表示の制御
+ *
+ * 状態管理：
+ * - Ready: ダウンロード準備完了
+ * - Downloading: ダウンロード中
+ * - Downloaded: ダウンロード完了
+ * - Error: エラー発生
+ *
+ * @property name モデルの名前
+ * @property source ダウンロード元のURI
+ * @property file 保存先のファイル
+ * @property sha256 チェックサム
+ *
+ * @see MainViewModel
+ * @see DownloadManager
+ */
+
 package com.example.llama
 
 import android.app.DownloadManager

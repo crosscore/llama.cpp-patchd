@@ -1,4 +1,31 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Dialogs.kt
+/**
+ * アプリケーションのUIダイアログコンポーネントを管理するクラス群
+ *
+ * このファイルは以下の主要なダイアログを提供します：
+ * - ModelDialog: モデル選択と読み込み
+ * - SystemPromptDialog: システムプロンプトの設定
+ * - SpeakerManagementDialog: 話者の管理
+ * - SpeakerRegistrationDialog: 新規話者の登録
+ * - ConversationHistoryDialog: 会話履歴の表示
+ *
+ * 実装の特徴：
+ * - Jetpack ComposeベースのモダンなUI
+ * - マテリアルデザイン3の採用
+ * - ステート管理の一元化
+ * - 再利用可能なコンポーネント設計
+ *
+ * 主なユースケース：
+ * - AIモデルの選択と管理
+ * - システム設定の構成
+ * - 話者プロファイルの管理
+ * - 会話ログの確認と操作
+ *
+ * @see MainActivity
+ * @see MainViewModel
+ * @see VoskViewModel
+ */
+
 package com.example.llama
 
 import android.annotation.SuppressLint
