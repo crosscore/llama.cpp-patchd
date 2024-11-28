@@ -5,6 +5,7 @@ import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.text.ParseException
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -42,6 +43,9 @@ class ConversationHistoryStorage private constructor(context: Context) {
         @Volatile
         private var instance: ConversationHistoryStorage? = null
 
+        // セッションIDの日時フォーマット
+        private val SESSION_ID_FORMAT = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US)
+
         fun getInstance(context: Context): ConversationHistoryStorage {
             return instance ?: synchronized(this) {
                 instance ?: ConversationHistoryStorage(context).also { instance = it }
@@ -77,10 +81,15 @@ class ConversationHistoryStorage private constructor(context: Context) {
                             )
                         }
 
-                        // セッションIDからタイムスタンプを抽出
-                        val timestamp = sessionDir.name.substringBefore("_").toLongOrNull()?.let {
-                            SimpleDateFormat("yyyyMMdd", Locale.getDefault()).parse(it.toString())?.time
-                        } ?: System.currentTimeMillis()
+                        // セッションIDから正確なタイムスタンプを抽出
+                        val timestamp = try {
+                            // セッションIDは "yyyyMMdd_HHmmss" 形式
+                            SESSION_ID_FORMAT.parse(sessionDir.name)?.time
+                        } catch (e: ParseException) {
+                            // パース失敗時のフォールバック: ファイルの最終更新時刻を使用
+                            Log.w(tag, "Failed to parse session ID ${sessionDir.name}, using last modified time", e)
+                            sessionDir.lastModified()
+                        } ?: sessionDir.lastModified()
 
                         SessionInfo(
                             sessionId = sessionDir.name,
@@ -100,7 +109,7 @@ class ConversationHistoryStorage private constructor(context: Context) {
     }
 
     fun startNewSession() {
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val timestamp = SESSION_ID_FORMAT.format(Date())
         currentSessionDir = File(conversationDir, timestamp).also { dir ->
             if (!dir.exists()) {
                 dir.mkdirs()
