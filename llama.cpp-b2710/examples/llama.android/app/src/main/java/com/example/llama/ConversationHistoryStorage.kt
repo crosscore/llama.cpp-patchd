@@ -1,3 +1,47 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/ConversationHistoryStorage.kt
+/**
+ * 会話履歴を永続化するストレージ管理クラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - 会話セッションの作成と管理
+ * - 会話履歴の保存と取得
+ * - セッション単位でのデータ管理
+ * - JSONフォーマットでの永続化
+ *
+ * データ構造：
+ * - セッションベースの階層構造
+ * - タイムスタンプによる時系列管理
+ * - 話者情報の関連付け
+ *
+ * ストレージ特性：
+ * - 外部ストレージへのJSON形式での保存
+ * - セッション単位のファイル分割
+ * - 効率的なクエリと取得処理
+ *
+ * エラー処理：
+ * - ストレージ不足対策
+ * - ファイルI/Oエラーハンドリング
+ * - 破損データの検出と回復
+ *
+ * @property appContext アプリケーションコンテキスト
+ * @property baseDir 基本ディレクトリパス
+ * @throws IllegalStateException 外部ストレージが利用できない場合
+ *
+ * データ保存形式:
+ * ```json
+ * {
+ *   "speakerId": "話者ID",
+ *   "speakerName": "話者名",
+ *   "message": "会話内容",
+ *   "timestamp": タイムスタンプ,
+ *   "confidence": 信頼度
+ * }
+ * ```
+ *
+ * @see ConversationEntry
+ * @see SessionInfo
+ */
+
 package com.example.llama
 
 import android.content.Context

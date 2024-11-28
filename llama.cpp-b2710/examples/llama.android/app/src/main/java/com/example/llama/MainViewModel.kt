@@ -1,4 +1,39 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/MainViewModel.kt
+/**
+ * llama.cppモデルとの対話を管理するメインViewModelクラス
+ *
+ * このViewModelは以下の主要な機能を提供します：
+ * - 言語モデルとの対話制御
+ * - モデルパラメータの管理
+ * - 会話履歴の制御
+ * - システムプロンプトの管理
+ * - メモリ使用状況の監視
+ *
+ * モデル制御：
+ * - トークン数制限の管理
+ * - コンテキストサイズの制御
+ * - KVキャッシュの制御
+ * - スレッド数の最適化
+ *
+ * 対話フォーマット：
+ * ```
+ * <|system|>システムプロンプト<|endofsystem|>
+ * <|user|>ユーザー入力<|endofuser|>
+ * <|assistant|>アシスタント応答<|endofassistant|>
+ * ```
+ *
+ * メモリ管理：
+ * - 動的なコンテキストサイズ調整
+ * - 最大トークン数の制限 (2048トークン)
+ * - 効率的なメモリ解放
+ *
+ * @property llm llama.cppのインスタンス
+ * @throws IllegalStateException モデルのロードや実行に失敗した場合
+ *
+ * @see Llm
+ * @see VoskViewModel
+ */
+
 package com.example.llama
 
 import android.util.Log

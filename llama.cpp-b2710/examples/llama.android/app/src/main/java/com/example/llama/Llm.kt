@@ -1,4 +1,41 @@
 // llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/Llm.kt
+/**
+ * llama.cppとのJNI連携を管理するクラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - JNIを介したllama.cppの制御
+ * - モデルのロードと解放
+ * - 推論処理の実行
+ * - リソース管理の最適化
+ *
+ * ネイティブ連携：
+ * - モデルファイルの読み込み
+ * - コンテキスト管理
+ * - バッチ処理の制御
+ * - トークナイズ処理
+ *
+ * スレッド管理：
+ * - 専用実行スレッドの確保
+ * - スレッドセーフな状態管理
+ * - 非同期処理のサポート
+ *
+ * エラー処理：
+ * - JNIエラーのハンドリング
+ * - メモリ不足対策
+ * - 適切なリソース解放
+ *
+ * セーフティネット：
+ * - クラッシュ防止機構
+ * - メモリリーク防止
+ * - 例外の適切な伝播
+ *
+ * @property threadLocalState スレッドローカルな状態管理
+ * @throws IllegalStateException モデル操作に失敗した場合
+ * @throws MaxTokensReachedException 最大トークン数に達した場合
+ *
+ * @see MainViewModel
+ */
+
 package com.example.llama
 
 import android.util.Log

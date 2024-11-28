@@ -1,3 +1,40 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/VoskRecognizer.kt
+/**
+ * Voskエンジンを使用した音声認識処理の実装クラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - 音声認識モデルの初期化と管理
+ * - リアルタイムの音声認識処理
+ * - 話者識別との連携
+ * - 認識結果の永続化
+ *
+ * 技術的な特徴：
+ * - Singleton パターンによる実装
+ * - Vosk音声認識エンジンとの統合
+ * - 16kHz、16bitモノラル音声入力対応
+ * - 日本語モデル「vosk-model-small-ja-0.22」使用
+ *
+ * 音声認識の処理フロー：
+ * 1. 音声データのバッファリング
+ * 2. 話者識別処理の実行
+ * 3. 音声認識結果の生成
+ * 4. 結果の永続化と通知
+ *
+ * @property context アプリケーションコンテキスト
+ * @property onPartialResult 中間認識結果のコールバック
+ * @property onResult 最終認識結果のコールバック
+ * @property onError エラー発生時のコールバック
+ *
+ * 使用するモデル：
+ * - 音声認識: vosk-model-small-ja-0.22
+ * - 話者識別: vosk-model-spk-0.4
+ *
+ * @see SpeechService
+ * @see Model
+ * @see Recognizer
+ * @see SpeakerIdentifier
+ */
+
 package com.example.llama
 
 import android.annotation.SuppressLint

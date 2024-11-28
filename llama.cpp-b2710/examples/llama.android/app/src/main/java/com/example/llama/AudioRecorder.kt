@@ -1,3 +1,37 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/AudioRecorder.kt
+/**
+ * 音声入力を管理し、生の音声データを提供するクラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - マイク入力からの音声データの取得
+ * - 音声データのバッファリング処理
+ * - 録音状態の管理
+ * - パーミッション状態の確認
+ *
+ * 技術仕様：
+ * - サンプリングレート: 16kHz
+ * - チャンネル: モノラル
+ * - ビット深度: 16bit PCM
+ * - バッファサイズ: 最小バッファサイズの2倍
+ *
+ * 安全性の考慮：
+ * - スレッドセーフな実装
+ * - 同期的なリソース管理
+ * - 適切なエラーハンドリング
+ * - パーミッションチェックの実装
+ *
+ * デザインパターン：
+ * - Singleton パターンによる単一インスタンス管理
+ * - Flow APIによる非同期データストリーム提供
+ *
+ * @property appContext アプリケーションコンテキスト
+ * @throws SecurityException 録音パーミッションがない場合
+ * @throws IllegalStateException AudioRecordの初期化失敗時
+ *
+ * @see AudioRecord
+ * @see Flow
+ */
+
 package com.example.llama
 
 import android.Manifest

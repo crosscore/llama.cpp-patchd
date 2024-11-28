@@ -1,3 +1,34 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/VoskViewModel.kt
+/**
+ * 音声認識機能のビジネスロジックを管理するViewModelクラス
+ *
+ * このViewModelは以下の主要な機能を提供します：
+ * - 音声認識の開始/停止の制御
+ * - 話者識別の管理
+ * - 認識結果のテキスト管理
+ * - 会話履歴の保存と管理
+ * - エラー状態の管理
+ *
+ * このクラスは以下のコンポーネントと連携します：
+ * - VoskRecognizer: 音声認識エンジン
+ * - AudioRecorder: 音声入力の制御
+ * - SpeakerIdentifier: 話者識別
+ * - ConversationHistoryStorage: 会話履歴の永続化
+ *
+ * 主な使用シナリオ：
+ * 1. 音声認識による会話のテキスト化
+ * 2. 複数話者の識別と管理
+ * 3. 会話履歴の記録と表示
+ *
+ * @property appContext アプリケーションコンテキスト
+ * @property onRecognitionResult 音声認識結果を受け取るコールバック
+ *
+ * @see VoskRecognizer
+ * @see AudioRecorder
+ * @see SpeakerIdentifier
+ * @see ConversationHistoryStorage
+ */
+
 package com.example.llama
 
 import android.app.Application
