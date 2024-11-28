@@ -50,7 +50,27 @@
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #define MAX_CONTEXT_SIZE 2048
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+jclass la_int_var;
+jmethodID la_int_var_value;
+jmethodID la_int_var_inc;
+
+std::string cached_token_chars;
+
 namespace {
+    /**
+     * ログメッセージをAndroidのログシステムにリダイレクトする
+     *
+     * @param level ログレベル (ERROR/INFO/WARN)
+     * @param fmt フォーマット文字列
+     * @param data 追加データ (未使用)
+     *
+     * @note ログレベルに応じて適切なAndroidログ関数を使用
+     * @note GGML/LLAMAのログ出力をAndroidのlogcatに統合
+     */
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
         if (level == GGML_LOG_LEVEL_ERROR) {
             __android_log_print(ANDROID_LOG_ERROR, TAG, fmt, data);
@@ -88,41 +108,38 @@ namespace {
     }
 }
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-jclass la_int_var;
-jmethodID la_int_var_value;
-jmethodID la_int_var_inc;
-
-std::string cached_token_chars;
-
+/**
+ * 文字列がUTF-8として有効かチェックする
+ *
+ * @param string 検証する文字列
+ * @return true: 有効なUTF-8文字列、false: 無効
+ *
+ * @note 以下のUTF-8シーケンスを検証:
+ *       - 1バイト (U+0000 to U+007F)
+ *       - 2バイト (U+0080 to U+07FF)
+ *       - 3バイト (U+0800 to U+FFFF)
+ *       - 4バイト (U+10000 to U+10FFFF)
+ * @note nullポインタは有効として扱う
+ */
 bool is_valid_utf8(const char *string) {
     if (!string) {
         return true;
     }
-
     const auto *bytes = (const unsigned char *) string;
     int num;
 
     while (*bytes != 0x00) {
-        if ((*bytes & 0x80) == 0x00) {
-            // U+0000 to U+007F
+        if ((*bytes & 0x80) == 0x00) {        // 0xxxxxxx: 1バイト文字（ASCII）
             num = 1;
-        } else if ((*bytes & 0xE0) == 0xC0) {
-            // U+0080 to U+07FF
+        } else if ((*bytes & 0xE0) == 0xC0) { // 110xxxxx: 2バイト文字
             num = 2;
-        } else if ((*bytes & 0xF0) == 0xE0) {
-            // U+0800 to U+FFFF
+        } else if ((*bytes & 0xF0) == 0xE0) { // 1110xxxx: 3バイト文字
             num = 3;
-        } else if ((*bytes & 0xF8) == 0xF0) {
-            // U+10000 to U+10FFFF
+        } else if ((*bytes & 0xF8) == 0xF0) { // 11110xxx: 4バイト文字
             num = 4;
         } else {
             return false;
         }
-
         bytes += 1;
         for (int i = 1; i < num; ++i) {
             if ((*bytes & 0xC0) != 0x80) {
@@ -131,10 +148,20 @@ bool is_valid_utf8(const char *string) {
             bytes += 1;
         }
     }
-
     return true;
 }
 
+/**
+ * モデルをファイルからロードする
+ *
+ * @param env JNI環境
+ * @param filename モデルファイルのパス (.gguf形式)
+ * @return ロードされたモデルのポインタ (失敗時は0)
+ * @throws IllegalStateException モデルのロードに失敗した場合
+ *
+ * @note メモリ使用量はモデルサイズに依存
+ * @note モデル使用後は必ずfree_model()で解放すること
+ */
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject /*unused*/, jstring filename) {
     llama_model_params model_params = llama_model_default_params();
@@ -154,11 +181,35 @@ Java_com_example_llama_Llm_load_1model(JNIEnv *env, jobject /*unused*/, jstring 
     return reinterpret_cast<jlong>(model);
 }
 
+/**
+ * モデルのメモリを解放する
+ *
+ * @param env JNI環境 (未使用)
+ * @param model 解放するモデルのポインタ
+ *
+ * @note モデルを使用しなくなった時点で必ず呼び出すこと
+ * @note 解放済みのモデルに対する操作は未定義動作
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1model(JNIEnv * /*unused*/, jobject /*unused*/, jlong model) {
     llama_free_model(reinterpret_cast<llama_model *>(model)); // NOLINT(*-no-int-to-ptr)
 }
 
+/**
+ * 推論用のコンテキストを新規作成する
+ *
+ * @param env JNI環境
+ * @param jmodel モデルのポインタ
+ * @param seed 乱数生成用シード値
+ * @param n_ctx コンテキストサイズ (最大2048トークン)
+ * @param n_threads 使用するスレッド数
+ * @return 生成されたコンテキストのポインタ (失敗時は0)
+ * @throws IllegalArgumentException モデルが無効な場合
+ * @throws IllegalStateException コンテキスト生成に失敗した場合
+ *
+ * @note メモリ使用量はコンテキストサイズに比例
+ * @note スレッド数は利用可能なCPUコア数を考慮して設定
+ */
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong jmodel, jint seed, jint n_ctx, jint n_threads) {
     auto *model = reinterpret_cast<llama_model *>(jmodel);
@@ -192,21 +243,61 @@ Java_com_example_llama_Llm_new_1context(JNIEnv *env, jobject /*unused*/, jlong j
     return reinterpret_cast<jlong>(context);
 }
 
+/**
+ * コンテキストのメモリを解放する
+ *
+ * @param env JNI環境 (未使用)
+ * @param context 解放するコンテキストのポインタ
+ *
+ * @note コンテキストを使用しなくなった時点で必ず呼び出すこと
+ * @note 解放済みのコンテキストに対する操作は未定義動作
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1context(JNIEnv * /*unused*/, jobject /*unused*/, jlong context) {
     llama_free(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
 
+/**
+ * バックエンドのリソースを解放する
+ *
+ * @param env JNI環境 (未使用)
+ *
+ * @note アプリケーション終了時に呼び出し
+ * @note GGML/LLAMAバックエンドが確保したリソースを解放
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_backend_1free(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_free();
 }
 
+/**
+ * Androidログシステムへのリダイレクトを設定する
+ *
+ * @param env JNI環境 (未使用)
+ *
+ * @note アプリケーション起動時に呼び出し
+ * @note log_callback関数をGGMLのログハンドラとして登録
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_log_1to_1android(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_log_set(log_callback, nullptr);
 }
 
+/**
+ * バッチ処理用のリソースを解放する
+ *
+ * @param env JNI環境 (未使用)
+ * @param batch_pointer 解放するバッチのポインタ
+ *
+ * @note 以下のメモリを順次解放:
+ *       - embd (埋め込みデータ)
+ *       - token (トークンデータ)
+ *       - pos (位置情報)
+ *       - n_seq_id (シーケンスID数)
+ *       - seq_id (シーケンスIDリスト)
+ *       - logits (ロジット)
+ * @note nullポインタは安全に無視される
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
                                        jlong batch_pointer) {
@@ -259,6 +350,20 @@ Java_com_example_llama_Llm_free_1batch(JNIEnv * /*unused*/, jobject /*unused*/,
     delete batch;
 }
 
+/**
+ * 新しいバッチ処理用のリソースを確保する
+ *
+ * @param env JNI環境
+ * @param context_pointer コンテキストのポインタ
+ * @param n_tokens トークン数 (未使用)
+ * @param embd 埋め込みフラグ (0: トークンモード, 1: 埋め込みモード)
+ * @param n_seq_max 最大シーケンス数
+ * @return 生成されたバッチのポインタ (失敗時は0)
+ * @throws OutOfMemoryError メモリ確保に失敗した場合
+ *
+ * @note バッチサイズはコンテキストサイズと最大コンテキストサイズの小さい方
+ * @note 確保したメモリは必ずfree_batch()で解放すること
+ */
 extern "C" JNIEXPORT jlong JNICALL
 Java_com_example_llama_Llm_new_1batch(
         JNIEnv *env,
@@ -340,16 +445,51 @@ Java_com_example_llama_Llm_new_1batch(
     return reinterpret_cast<jlong>(batch);
 }
 
+/**
+ * バックエンドを初期化する
+ *
+ * @param env JNI環境 (未使用)
+ *
+ * @note アプリケーション起動時に一度だけ呼び出す
+ * @note GGML/LLAMAバックエンドの初期化を実行
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_backend_1init(JNIEnv * /*unused*/, jobject /*unused*/) {
     llama_backend_init();
 }
 
+/**
+ * システム情報を取得する
+ *
+ * @param env JNI環境
+ * @return システム情報を含む文字列
+ *
+ * @note 以下の情報を含む:
+ *       - CPUアーキテクチャ
+ *       - CPUコア数
+ *       - BLAS/CUBLAS/METAL等のバックエンド情報
+ *       - コンパイル時の最適化オプション
+ */
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_system_1info(JNIEnv *env, jobject /*unused*/) {
     return env->NewStringUTF(llama_print_system_info());
 }
 
+/**
+ * 文章生成の初期化を行う
+ *
+ * @param env JNI環境
+ * @param context_pointer LLAMAコンテキストのポインタ
+ * @param batch_pointer バッチ処理のポインタ
+ * @param jtext 入力プロンプト文字列
+ * @param n_len 生成する最大トークン数
+ * @return 初期化後のトークン数
+ *
+ * @note プロンプトを解析してトークン化し、初期状態を設定
+ * @note キャッシュされたトークン文字列をクリア
+ * @note KVキャッシュのサイズチェックを実行
+ * @note g_input_token_countを更新
+ */
 extern "C" JNIEXPORT jint JNICALL
 Java_com_example_llama_Llm_completion_1init(
         JNIEnv *env,
@@ -404,6 +544,25 @@ Java_com_example_llama_Llm_completion_1init(
     return batch->n_tokens;
 }
 
+/**
+ * 文章生成のメインループを実行する
+ *
+ * @param env JNI環境
+ * @param context_pointer LLAMAコンテキストのポインタ
+ * @param batch_pointer バッチ処理のポインタ
+ * @param n_len 生成する最大トークン数
+ * @param intvar_ncur 現在のトークン位置を管理するオブジェクト
+ * @return 生成されたトークンの文字列 (特殊トークンの場合は制御文字列)
+ *
+ * @note 以下の特殊トークンを返す可能性あり:
+ *       - "<EOS_TOKEN_DETECTED>": 終了トークン検出
+ *       - "<MAX_TOKENS_REACHED>": 最大トークン数到達
+ *       - "<CONVERSATION_END>": 会話終了(改行2回)
+ *       - "": UTF-8変換失敗や中間トークン
+ *
+ * @note トークンのUTF-8検証と結合処理を実行
+ * @note 生成状況のログ出力を含む
+ */
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_example_llama_Llm_completion_1loop(
         JNIEnv *env,
@@ -515,7 +674,6 @@ Java_com_example_llama_Llm_completion_1loop(
         } else if ((first_byte & 0xF0) == 0xE0) { expected_length = 3;
         } else if ((first_byte & 0xF8) == 0xF0) { expected_length = 4;
         }
-
         needs_next_token = cached_token_chars.length() < expected_length;
     }
 
@@ -593,18 +751,32 @@ Java_com_example_llama_Llm_completion_1loop(
     return new_token;
 }
 
+/**
+ * KVキャッシュをクリアする
+ *
+ * @param env JNI環境 (未使用)
+ * @param context クリア対象のコンテキストポインタ
+ *
+ * @note 会話履歴をリセットする際に使用
+ * @note キャッシュクリアにより文脈が失われる
+ */
 extern "C" JNIEXPORT void JNICALL
 Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unused*/,
                                             jlong context) {
     llama_kv_cache_clear(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
 
-#ifdef __cplusplus
-}
-#endif
-
-#pragma clang diagnostic pop
-
+/**
+ * 文字列をトークンに分割する
+ *
+ * @param env JNI環境
+ * @param model モデルのポインタ
+ * @param text トークン化する文字列
+ * @return トークンIDの配列
+ *
+ * @note BPE (Byte Pair Encoding) アルゴリズムを使用
+ * @note 結果は必要に応じてJavaのint配列に変換
+ */
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlong model, jstring text) {
     const char *input = env->GetStringUTFChars(text, nullptr);
@@ -621,3 +793,9 @@ Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlon
 
     return result;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
+#pragma clang diagnostic pop
