@@ -15,6 +15,10 @@
 #define LOGe(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 #define MAX_CONTEXT_SIZE 2048
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 namespace {
     extern "C" void log_callback(ggml_log_level level, const char *fmt, void *data) {
         if (level == GGML_LOG_LEVEL_ERROR) {
@@ -52,10 +56,6 @@ namespace {
         g_total_tokens = g_input_token_count + g_output_token_count;
     }
 }
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 jclass la_int_var;
 jmethodID la_int_var_value;
@@ -564,12 +564,6 @@ Java_com_example_llama_Llm_kv_1cache_1clear(JNIEnv * /*unused*/, jobject /*unuse
     llama_kv_cache_clear(reinterpret_cast<llama_context *>(context)); // NOLINT(*-no-int-to-ptr)
 }
 
-#ifdef __cplusplus
-}
-#endif
-
-#pragma clang diagnostic pop
-
 extern "C" JNIEXPORT jintArray JNICALL
 Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlong model, jstring text) {
     const char *input = env->GetStringUTFChars(text, nullptr);
@@ -586,3 +580,9 @@ Java_com_example_llama_Llm_llama_1tokenize(JNIEnv *env, jobject /*unused*/, jlon
 
     return result;
 }
+
+#ifdef __cplusplus
+}
+#endif
+
+#pragma clang diagnostic pop
