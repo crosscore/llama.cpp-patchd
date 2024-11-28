@@ -108,11 +108,12 @@ class VoskViewModel(
         }
     }
 
-    // 初期化時に会話履歴を読み込む
+    // セッション作成フラグ
+    private var isSessionCreated = false
+
     init {
         initializeModel()
-        conversationStorage.startNewSession()
-        loadConversationHistory()  // 明示的に履歴を読み込む
+        loadConversationHistory()
     }
 
     // 会話履歴の取得件数を定数として定義
@@ -252,6 +253,13 @@ class VoskViewModel(
                     return@launch
                 }
 
+                // Recognition モードでかつセッションが未作成の場合のみ、新しいセッションを作成
+                if (mode == RecordingMode.Recognition && !isSessionCreated) {
+                    conversationStorage.startNewSession()
+                    isSessionCreated = true
+                    Log.d(tag, "New conversation session created")
+                }
+
                 currentTranscript = ""
                 errorMessage = null
                 temporaryRecording.clear()
@@ -325,11 +333,13 @@ class VoskViewModel(
         }
     }
 
+    // ViewModel破棄時にセッションフラグをリセット
     override fun onCleared() {
         super.onCleared()
         stopRecording()
         voskRecognizer.release()
         speakerIdentifier.release()
+        isSessionCreated = false
     }
 
     // 録音データの取得
