@@ -1,3 +1,38 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/SpeakerIdentifier.kt
+/**
+ * 話者識別機能を提供するクラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - 話者識別モデルの管理
+ * - 音声特徴量の抽出
+ * - 話者の識別処理
+ * - 類似度計算の実装
+ *
+ * 技術的特徴：
+ * - Voskモデルによる話者識別
+ * - 特徴ベクトルの抽出
+ * - コサイン類似度による話者マッチング
+ * - メモリ効率を考慮したWeakReference実装
+ *
+ * 音声処理：
+ * - 16kHzサンプリングレート対応
+ * - 音声データの正規化処理
+ * - バッチ処理による効率化
+ * - 特徴抽出の最適化
+ *
+ * エラーハンドリング：
+ * - モデル初期化エラーの処理
+ * - 音声データ処理時の例外処理
+ * - リソース解放の管理
+ * - ログ出力の実装
+ *
+ * @property contextRef アプリケーションコンテキストの弱参照
+ * @throws IllegalStateException モデル初期化失敗時
+ *
+ * @see SpeakerStorage
+ * @see VoskRecognizer
+ */
+
 package com.example.llama
 
 import android.app.Application

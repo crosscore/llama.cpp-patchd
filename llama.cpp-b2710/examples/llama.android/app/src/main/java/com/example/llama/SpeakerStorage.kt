@@ -1,3 +1,39 @@
+// llama.cpp-b2710/examples/llama.android/app/src/main/java/com/example/llama/SpeakerStorage.kt
+/**
+ * 話者データの永続化を管理するクラス
+ *
+ * このクラスは以下の主要な機能を提供します：
+ * - 話者メタデータの保存
+ * - 音声データの保存管理
+ * - 特徴ベクトルの永続化
+ * - 話者データのCRUD操作
+ *
+ * データ構造：
+ * - メタデータのJSON形式での保存
+ * - 音声データのRAWフォーマット保存
+ * - 特徴ベクトルのJSON形式保存
+ * - 階層的なディレクトリ構造
+ *
+ * 永続化機能：
+ * - 外部ストレージへの保存
+ * - バイナリデータの効率的な管理
+ * - ファイルI/O操作の最適化
+ * - アトミックな更新処理
+ *
+ * セキュリティ考慮：
+ * - 適切なパーミッション管理
+ * - データの整合性チェック
+ * - エラーリカバリ機能
+ * - 安全なファイル操作
+ *
+ * @property appContext アプリケーションコンテキスト
+ * @throws IllegalStateException 外部ストレージ利用不可時
+ * @throws IOException ファイル操作失敗時
+ *
+ * @see SpeakerIdentifier
+ * @see VoskViewModel
+ */
+
 package com.example.llama
 
 import android.content.Context
