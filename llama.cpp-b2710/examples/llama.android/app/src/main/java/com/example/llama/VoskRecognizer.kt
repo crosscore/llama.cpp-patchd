@@ -36,9 +36,14 @@ class VoskRecognizer private constructor(private val context: Context) {
     var onError: ((Exception) -> Unit)? = null
     var onSpeakerIdentified: ((String, Float) -> Unit)? = null
 
-    // 音声バッファ（話者識別用）
+    // 話者識別用
     private val audioBuffer = mutableListOf<Short>()
-    private val speakerBufferSize = 16000 * 5 // 5秒分のオーディオデータ
+    private val speakerBufferSize = 16000 * 2  // 2秒分に短縮
+    private val switchingThreshold = 0.3f      // 話者切り替わり用の閾値
+    private var lastSpeakerId: String? = null
+    private var lastConfidence: Float = 0f
+    private var lastIdentificationTime = System.currentTimeMillis()
+    private val identificationTimeout = 10000L  // 10秒
 
     // SpeakerStorageのインスタンス
     private val speakerStorage by lazy {
@@ -204,6 +209,7 @@ class VoskRecognizer private constructor(private val context: Context) {
     /**
      * 話者識別の実行
      */
+
     private fun performSpeakerIdentification(audioData: ShortArray) {
         try {
             if (audioData.isEmpty() || audioData.size < 16000) {
@@ -211,36 +217,47 @@ class VoskRecognizer private constructor(private val context: Context) {
                 return
             }
 
+            checkIdentificationTimeout()
+
             val processedAudio = preprocessAudioData(audioData)
 
             speakerIdentifier?.let { identifier ->
                 val embedding = identifier.extractEmbedding(processedAudio)
                 embedding?.let { emb ->
                     identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
-                        if (score > 0.5f) {
-                            val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
-                                .find { it.id == speakerId }
-
-                            speakerMetadata?.let {
-                                // 話者IDを更新
-                                currentSpeakerId = speakerId
-                                onSpeakerIdentified?.invoke(speakerId, score)
-                                currentSpeakerConfidence = score
-
-                                Log.d(tag, "Speaker identified: ${it.name} (ID: $speakerId) with confidence: $score")
-                            }
-                        } else {
-                            Log.d(tag, "Speaker identification score too low: $score")
-                            currentSpeakerId = "unknown"
-                            onSpeakerIdentified?.invoke("unknown", 0.0f)
-                            currentSpeakerConfidence = 0.0f
+                        val shouldSwitch = when {
+                            // 前回と異なる話者の場合
+                            speakerId != lastSpeakerId -> true
+                            // 前回と同じ話者だが、信頼度が大きく低下した場合
+                            speakerId == lastSpeakerId && (lastConfidence - score) > switchingThreshold -> false
+                            // それ以外の場合は現在の話者を維持
+                            else -> speakerId == currentSpeakerId
                         }
+
+                        if (shouldSwitch) {
+                            currentSpeakerId = speakerId
+                            onSpeakerIdentified?.invoke(speakerId, score)
+                            currentSpeakerConfidence = score
+                            Log.d(tag, "Speaker switched to: $speakerId with confidence: $score")
+                        }
+
+                        lastSpeakerId = speakerId
+                        lastConfidence = score
+                        lastIdentificationTime = System.currentTimeMillis()
                     }
                 }
             }
         } catch (e: Exception) {
             Log.e(tag, "Error in speaker identification", e)
             onError?.invoke(e)
+        }
+    }
+
+    private fun checkIdentificationTimeout() {
+        if (System.currentTimeMillis() - lastIdentificationTime > identificationTimeout) {
+            lastSpeakerId = null
+            lastConfidence = 0f
+            Log.d(tag, "Speaker identification state reset due to timeout")
         }
     }
 

@@ -118,7 +118,6 @@ class SpeakerIdentifier private constructor(application: Application) {
         }
     }
 
-    @Synchronized
     fun identifySpeaker(embedding: FloatArray): Pair<String, Float>? {
         try {
             val context = contextRef.get() ?: return null
@@ -148,10 +147,7 @@ class SpeakerIdentifier private constructor(application: Application) {
 
                         if (bestMatch == null || similarity > bestMatch!!.third) {
                             bestMatch = Triple(metadata.id, metadata.name, similarity)
-                            Log.d(tag, "New best match: ${metadata.name} with score $similarity")
                         }
-                    } else {
-                        Log.w(tag, "Embedding file not found: ${metadata.embeddingPath}")
                     }
                 } catch (e: Exception) {
                     Log.e(tag, "Error processing embedding for speaker ${metadata.id}", e)
