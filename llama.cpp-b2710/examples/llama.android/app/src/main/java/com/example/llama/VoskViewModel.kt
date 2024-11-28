@@ -127,19 +127,6 @@ class VoskViewModel(
         }
     }
 
-    // 会話履歴の更新
-    private fun updateRecentConversations() {
-        viewModelScope.launch {
-            try {
-                val entries = conversationStorage.getRecentEntries(MAX_CONVERSATION_HISTORY)
-                Log.d(tag, "Updating conversations, loaded ${entries.size} entries")
-                recentConversations = entries
-            } catch (e: Exception) {
-                Log.e(tag, "Failed to update recent conversations", e)
-            }
-        }
-    }
-
     fun getApplication(): Application {
         return appContext
     }
@@ -191,27 +178,6 @@ class VoskViewModel(
                 json.optString("text").let { text ->
                     if (text.isNotBlank()) {
                         currentTranscript = text
-                        // 話者認識の結果を待ってから会話履歴に追加する
-                        currentSpeakerId?.let { speakerId ->
-                            // 話者名を取得
-                            val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
-                                .find { it.id == speakerId }
-
-                            if (speakerMetadata != null) {
-                                // 会話エントリーを追加
-                                conversationStorage.addEntry(
-                                    ConversationHistoryStorage.ConversationEntry(
-                                        speakerId = speakerId,
-                                        speakerName = speakerMetadata.name,
-                                        message = text,
-                                        timestamp = System.currentTimeMillis(),
-                                        confidence = currentSpeakerConfidence ?: 0f
-                                    )
-                                )
-                                // 最新の会話履歴を更新
-                                updateRecentConversations()
-                            }
-                        }
                         onRecognitionResult(text)
                     }
                 }
