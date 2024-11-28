@@ -209,7 +209,6 @@ class VoskRecognizer private constructor(private val context: Context) {
     /**
      * 話者識別の実行
      */
-
     private fun performSpeakerIdentification(audioData: ShortArray) {
         try {
             if (audioData.isEmpty() || audioData.size < 16000) {
@@ -226,21 +225,20 @@ class VoskRecognizer private constructor(private val context: Context) {
                 embedding?.let { emb ->
                     identifier.identifySpeaker(emb)?.let { (speakerId, score) ->
                         val shouldSwitch = when {
-                            // 前回と異なる話者の場合
                             speakerId != lastSpeakerId -> true
-                            // 前回と同じ話者だが、信頼度が大きく低下した場合
                             speakerId == lastSpeakerId && (lastConfidence - score) > switchingThreshold -> false
-                            // それ以外の場合は現在の話者を維持
                             else -> speakerId == currentSpeakerId
                         }
 
                         if (shouldSwitch) {
                             currentSpeakerId = speakerId
-                            onSpeakerIdentified?.invoke(speakerId, score)
                             currentSpeakerConfidence = score
+                            onSpeakerIdentified?.invoke(speakerId, score)
                             Log.d(tag, "Speaker switched to: $speakerId with confidence: $score")
-                        }
 
+                            // 保留中のメッセージがあれば処理
+                            processPendingMessages()
+                        }
                         lastSpeakerId = speakerId
                         lastConfidence = score
                         lastIdentificationTime = System.currentTimeMillis()
@@ -253,6 +251,34 @@ class VoskRecognizer private constructor(private val context: Context) {
         }
     }
 
+    // 保留中のメッセージを処理
+    private fun processPendingMessages() {
+        pendingMessages.forEach { message ->
+            saveSpeechEntry(message.text, message.timestamp)
+        }
+        pendingMessages.clear()
+    }
+
+    // 会話エントリーの保存
+    private fun saveSpeechEntry(text: String, timestamp: Long = System.currentTimeMillis()) {
+        val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
+            .find { it.id == currentSpeakerId }
+
+        // 会話エントリーを追加
+        val entry = ConversationHistoryStorage.ConversationEntry(
+            speakerId = currentSpeakerId ?: "unknown",
+            speakerName = speakerMetadata?.name ?: "Unknown Speaker",
+            message = text,
+            timestamp = timestamp,
+            confidence = currentSpeakerConfidence ?: 0f
+        )
+
+        conversationStorage.addEntry(entry)
+        updateRecentConversations()
+
+        Log.d(tag, "Saved speech entry: $entry")
+    }
+
     private fun checkIdentificationTimeout() {
         if (System.currentTimeMillis() - lastIdentificationTime > identificationTimeout) {
             lastSpeakerId = null
@@ -260,6 +286,13 @@ class VoskRecognizer private constructor(private val context: Context) {
             Log.d(tag, "Speaker identification state reset due to timeout")
         }
     }
+
+    // 保留中のメッセージを保持するキュー
+    private data class PendingMessage(
+        val text: String,
+        val timestamp: Long
+    )
+    private val pendingMessages = mutableListOf<PendingMessage>()
 
     private fun onResultHandler(hypothesis: String) {
         try {
@@ -269,26 +302,15 @@ class VoskRecognizer private constructor(private val context: Context) {
             if (text.isNotBlank()) {
                 onResult?.invoke(hypothesis)
 
-                // 現在識別されている話者情報を取得
-                val speakerMetadata = speakerStorage.getAllSpeakerMetadata()
-                    .find { it.id == currentSpeakerId }
-
-                // 会話エントリーを追加
-                val entry = ConversationHistoryStorage.ConversationEntry(
-                    speakerId = currentSpeakerId ?: "unknown",
-                    speakerName = speakerMetadata?.name ?: "Unknown Speaker",
-                    message = text,
-                    timestamp = System.currentTimeMillis(),
-                    confidence = currentSpeakerConfidence ?: 0f
-                )
-
-                conversationStorage.addEntry(entry)
-                updateRecentConversations()
-
-                // 音声バッファをクリア
-                if (audioBuffer.size >= speakerBufferSize) {
-                    audioBuffer.clear()
+                // 現在の話者が未設定の場合は、メッセージを一時保留
+                if (currentSpeakerId == null) {
+                    pendingMessages.add(PendingMessage(text, System.currentTimeMillis()))
+                    Log.d(tag, "Message queued for pending speaker identification: $text")
+                    return
                 }
+
+                // 話者が設定済みの場合は直接保存
+                saveSpeechEntry(text)
             }
         } catch (e: Exception) {
             Log.e(tag, "Error processing recognition result", e)
